@@ -79,6 +79,10 @@ export function Hero() {
       ref={rootRef}
       className="relative h-[100svh] w-full overflow-hidden bg-ink"
     >
+      <h1 className="sr-only">
+        itto is an ai minecraft co-op buddy that joins your world, follows you,
+        helps with tasks, remembers your world, and hangs in your discord call.
+      </h1>
       {/* focus wrapper: uniform blur + brightness racked by GSAP (--fb / --fbr) */}
       <div
         ref={focusRef}

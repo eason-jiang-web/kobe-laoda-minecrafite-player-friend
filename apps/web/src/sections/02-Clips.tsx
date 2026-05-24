@@ -6,8 +6,8 @@ import { HeaderReveal } from "@/components/HeaderReveal";
 import { Reveal } from "@/components/Reveal";
 
 /**
- * 02 — Clips (source: "Latest"). Desktop source geometry is an editorial
- * masonry: 160px header, two 720x436 feature tiles, then 480x291 small tiles.
+ * 02 — Loops (source: "Latest"). Desktop source geometry is an editorial
+ * masonry: 160px header and two 720x436 feature tiles.
  */
 export function Clips() {
   const featureClips = clips.slice(0, 2);
@@ -16,7 +16,7 @@ export function Clips() {
     <section id="clips" className="overflow-hidden bg-canvas pb-px pt-24">
       <div className="mb-[62px] flex h-32 items-start justify-between px-[10px] md:px-5">
         <HeaderReveal className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-normal text-ink">
-          clips
+          loops
         </HeaderReveal>
         <HeaderReveal
           as="span"

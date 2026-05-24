@@ -4,21 +4,21 @@
 export const brand = {
   name: "itto",
   mark: "itto®",
-  tagline: "your minecraft duo",
+  tagline: "ai minecraft co-op buddy",
   email: "founders@kalilabs.ai",
   location: "your world",
   year: "2026",
 };
 
 export const nav = [
-  { label: "clips", href: "#clips" },
+  { label: "loops", href: "#clips" },
   { label: "about", href: "#about" },
-  { label: "how it plays", href: "#points" },
+  { label: "how it works", href: "#points" },
   { label: "early access", href: "#cta" },
 ];
 
-// section 2 — "latest" → itto clips (gameplay moments). Only real clip
-// videos live here; placeholder/default thumbnail cards were removed.
+// section 2 — "latest" → itto loops. Only real clip videos live here;
+// placeholder/default thumbnail cards were removed.
 export const clips = [
   {
     title: "Sakura Puddle",
@@ -37,39 +37,41 @@ export const clips = [
 // section 3 — about, 4-column data layout
 export const about = {
   intro:
-    "An AI buddy that spawns next to you, follows you around, helps out, and hangs in your Discord call. Not a coach, not a tutorial — a friend who happens to be good at the game.",
+    "itto joins your Minecraft world, follows you around, helps with tasks, and hangs in your Discord call. Not a coach. Not a tutorial bot. A duo partner.",
   columns: [
     {
       head: "what it does",
       items: [
-        "Follows You",
-        "Mines & Builds",
+        "Spawns Next To You",
+        "Follows Nearby",
+        "Mines Alongside",
+        "Places Blocks",
         "Fights Mobs",
-        "Carries Loot",
-        "Answers Questions",
-        "Talks In Your Call",
-        "Reads The Chat",
+        "Fetches Items",
+        "Scouts Ahead",
+        "Talks In Discord",
       ],
     },
     {
-      head: "how it plays",
+      head: "how it works",
       items: [
-        "Survival",
-        "Creative",
-        "Co-op",
-        "Speedruns",
-        "Just Hanging",
+        "Fast Loop Reflexes",
+        "Slow Loop Decisions",
+        "Structured Game State",
+        "MCP Tool Calls",
+        "World Memory",
+        "Seeded Skills",
       ],
     },
     {
       head: "runs on",
       items: [
-        "Java 1.20.6",
-        "Bedrock Soon",
+        "Mineflayer",
+        "MCP Server",
+        "Hermes Agent",
+        "Claude",
         "Discord Voice",
-        "ElevenLabs Realtime",
-        "Mineflayer Bot",
-        "Your Own Server",
+        "Java 1.20.6",
       ],
     },
   ],
@@ -77,33 +79,34 @@ export const about = {
 
 // section 4 / banner headers
 export const banners = {
-  primary: ["FOLLOWS YOU", "& HELPS OUT"],
-  secondary: ["A DUO THAT", "ACTUALLY PLAYS"],
+  primary: ["JOINS YOUR WORLD", "& STICKS CLOSE"],
+  secondary: ["A DUO PARTNER", "WITH ACTUAL HANDS"],
 };
 
 // section 5 — points / manifesto
 export const points = {
   manifesto:
-    "AN AI THAT JOINS YOUR WORLD AND JUST PLAYS WITH YOU — MINING, BUILDING, FIGHTING, AND TALKING IN YOUR CALL LIKE A FRIEND WHO NEVER LOGS OFF",
+    "AN AI MINECRAFT DUO PARTNER THAT FOLLOWS, HELPS, TALKS, AND LEARNS YOUR WORLD WITHOUT TURNING THE GAME INTO A TUTORIAL",
   left: {
-    head: "the idea",
-    body: "Most game AI is a menu. itto is a presence — it shows up next to you, watches what you're doing, and pitches in. It feels less like a tool and more like a second player.",
+    head: "the body",
+    body: "A Mineflayer bot runs the fast loop: follow, stay alive, dodge lava, eat, and keep close without waiting on a model. That is what makes itto feel present.",
   },
   right: {
-    head: "the loop",
-    body: "It sees the world through the bot, decides what's worth doing, and acts — then talks it through in your voice channel. Helpful, chatty, and occasionally chaotic.",
+    head: "the brain",
+    body: "Hermes and Claude run the slow loop over compact game state. They read MCP resources, call tools, remember your world, and talk only when it matters.",
   },
 };
 
 // section 7 — clients → works with
 export const worksWith = [
-  "DISCORD VOICE",
   "MINEFLAYER",
-  "ELEVENLABS",
-  "JAVA EDITION",
-  "MINEHUT",
+  "MCP TOOLS",
+  "HERMES AGENT",
   "CLAUDE",
-  "YOUR FRIENDS",
+  "DISCORD VOICE",
+  "STRUCTURED STATE",
+  "WORLD MEMORY",
+  "JAVA EDITION",
 ];
 
 // closing banner wordmark, split like WA·CO®

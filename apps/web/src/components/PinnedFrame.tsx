@@ -62,9 +62,9 @@ export function PinnedFrame() {
         </nav>
 
         <div className="u-label absolute left-[25.55%] top-5">
-          ai minecraft duo
+          {brand.tagline}
           <br />
-          based in {brand.location}
+          spawns in {brand.location}
         </div>
 
         <div className="u-label absolute left-[50.35%] top-5">

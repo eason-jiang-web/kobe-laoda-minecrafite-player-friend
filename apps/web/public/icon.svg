@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="itto">
+  <rect width="512" height="512" fill="#050505"/>
+  <path d="M64 64h384v384H64z" fill="none" stroke="#f8f7f2" stroke-width="10"/>
+  <text x="256" y="286" fill="#f8f7f2" font-family="Arial, Helvetica, sans-serif" font-size="108" font-weight="400" text-anchor="middle" letter-spacing="0">it.to</text>
+  <text x="256" y="346" fill="#f8f7f2" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="400" text-anchor="middle" letter-spacing="3">MINECRAFT DUO</text>
+</svg>

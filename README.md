@@ -69,6 +69,27 @@ hermes platform discord enable
 
 Then hop in the MC world + the Discord call and play.
 
+## Deploy the landing page on Vercel
+
+The landing page lives in `apps/web`, so create the Vercel project with:
+
+| Setting | Value |
+|---|---|
+| **Root Directory** | `apps/web` |
+| **Framework Preset** | `Next.js` |
+| **Install Command** | `bun install` |
+| **Build Command** | `bun run build` |
+| **Output Directory** | leave blank / Vercel default |
+
+Set this environment variable in Vercel:
+
+```bash
+NEXT_PUBLIC_SITE_URL=https://itto.stephenhung.me
+```
+
+That URL is used for canonical metadata, `robots.txt`, `sitemap.xml`, and JSON-LD.
+Change it if the production domain is different.
+
 ## Status
 
 Early scaffold. The structure, loops, control surface, MCP tools, and seed

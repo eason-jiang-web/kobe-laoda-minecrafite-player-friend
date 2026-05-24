@@ -35,7 +35,7 @@ export function Closing() {
       <div className="absolute left-5 right-5 top-[471px] flex h-12 items-center justify-between">
         <p className="u-label text-left">{year.slice(0, 2)}</p>
         <HeaderReveal className="w-[460px] text-center font-sans text-[24px] font-medium uppercase leading-none">
-          visual co-op
+          minecraft co-op
           <br />
           in your world
         </HeaderReveal>

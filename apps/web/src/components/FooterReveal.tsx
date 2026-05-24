@@ -42,11 +42,11 @@ export function FooterReveal() {
           <div className="pointer-events-none absolute -bottom-[11px] -left-[52px] h-2 w-2 border-b border-l border-ink" />
           <div className="pointer-events-none absolute -bottom-[11px] -right-[52px] h-2 w-2 border-b border-r border-ink" />
           <p className="font-sans text-[24px] font-medium uppercase leading-none">
-            joins the call
+            spawns next to you
             <br />
-            follows, builds, fights
+            follows, helps, talks
             <br />
-            carries the run
+            remembers the world
           </p>
         </div>
 

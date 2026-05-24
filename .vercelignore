@@ -1,0 +1,11 @@
+node_modules
+apps/*/node_modules
+packages/*/node_modules
+.next
+apps/web/.next
+.vercel/output
+apps/web/.vercel/output
+dist
+build
+*.log
+tasks

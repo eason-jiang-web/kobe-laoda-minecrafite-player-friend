@@ -1,0 +1,4 @@
+.next
+.vercel/output
+node_modules
+*.log
