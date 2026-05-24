@@ -1,6 +1,6 @@
 # itto
 
-> an ai buddy that joins your minecraft world, follows you around, helps out, and hangs in your discord call.
+> an ai buddy that joins your minecraft world, follows you around, helps out, and hangs in your discord call. :3
 
 You log in, itto spawns next to you, joins your voice call, and you just play
 together. It talks, it helps, it learns your playstyle over sessions. Not a
