@@ -84,3 +84,40 @@ body {
     animation: none;
   }
 }
+
+@keyframes logo-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.logo-marquee {
+  animation: logo-marquee 18s linear infinite;
+}
+
+.logo-marquee-window {
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    black 48px,
+    black calc(100% - 48px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    black 48px,
+    black calc(100% - 48px),
+    transparent 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-marquee {
+    animation: none;
+    transform: translate3d(0, 0, 0);
+  }
+}

@@ -19,7 +19,7 @@ export function Closing() {
     >
       <video
         className="absolute inset-0 h-full w-full object-cover"
-        src="/video/hero.mp4"
+        src="/video/clip-coop-run.mp4"
         autoPlay
         muted
         loop

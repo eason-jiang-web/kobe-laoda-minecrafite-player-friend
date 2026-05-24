@@ -17,14 +17,21 @@ export const nav = [
   { label: "early access", href: "#cta" },
 ];
 
-// section 2 — "latest" → itto clips (gameplay moments). videos are stand-ins;
-// the source's video grid pattern with mono captions.
+// section 2 — "latest" → itto clips (gameplay moments). Only real clip
+// videos live here; placeholder/default thumbnail cards were removed.
 export const clips = [
-  { title: "First Night Together", who: "SURVIVAL", date: "01—03—2026" },
-  { title: "Strip Mine Run", who: "CAVES", date: "14—02—2026" },
-  { title: "Built a Base, Mostly", who: "CREATIVE", date: "22—01—2026" },
-  { title: "Nether Detour", who: "EXPEDITION", date: "09—01—2026" },
-  { title: "Just Vibing in VC", who: "HANGOUT", date: "30—12—2025" },
+  {
+    title: "Sakura Puddle",
+    who: "CHERRY GROVE",
+    date: "24—05—2026",
+    videoSrc: "/video/clip-sakura-puddle.mp4",
+  },
+  {
+    title: "Trail for Two",
+    who: "EXPLORATION",
+    date: "24—05—2026",
+    videoSrc: "/video/clip-two-players-exploring.mp4",
+  },
 ];
 
 // section 3 — about, 4-column data layout

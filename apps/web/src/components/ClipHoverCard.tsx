@@ -7,6 +7,7 @@ type ClipHoverCardProps = {
   title: string;
   who: string;
   date: string;
+  videoSrc: string;
   mediaClassName: string;
 };
 
@@ -14,6 +15,7 @@ export function ClipHoverCard({
   title,
   who,
   date,
+  videoSrc,
   mediaClassName,
 }: ClipHoverCardProps) {
   const root = useRef<HTMLDivElement>(null);
@@ -77,7 +79,7 @@ export function ClipHoverCard({
         >
           <video
             className="h-full w-full object-cover"
-            src="/video/hero.mp4"
+            src={videoSrc}
             autoPlay
             muted
             loop
