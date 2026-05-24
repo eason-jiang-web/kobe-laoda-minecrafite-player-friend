@@ -55,8 +55,14 @@ export class ElevenConversation {
     ws.addEventListener("error", (e) => log.error("ws error", (e as ErrorEvent).message ?? e));
   }
 
+  private sentAudioOnce = false;
+
   /** Send a chunk of user mic audio (mono 16-bit PCM at userInputRate). */
   sendAudio(pcm: Buffer): void {
+    if (!this.sentAudioOnce) {
+      log.info("→ forwarding mic audio to ElevenLabs");
+      this.sentAudioOnce = true;
+    }
     this.send({ user_audio_chunk: pcm.toString("base64") });
   }
 
@@ -124,10 +130,10 @@ export class ElevenConversation {
         this.send({ type: "pong", event_id: msg.ping_event?.event_id });
         break;
       case "user_transcript":
-        log.debug("user:", msg.user_transcription_event?.user_transcript);
+        log.info("🗣️  user:", msg.user_transcription_event?.user_transcript);
         break;
       case "agent_response":
-        log.debug("itto:", msg.agent_response_event?.agent_response);
+        log.info("🤖 itto:", msg.agent_response_event?.agent_response);
         break;
       default:
         break;

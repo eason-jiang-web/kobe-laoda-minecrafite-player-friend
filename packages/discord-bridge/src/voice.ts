@@ -93,19 +93,32 @@ export class VoiceHub {
     receiver.speaking.on("start", (userId) => {
       if (active.has(userId)) return;
       active.add(userId);
+      log.info(`🎤 hearing ${userId}`);
 
       const opus = receiver.subscribe(userId, {
         end: { behavior: EndBehaviorType.AfterSilence, duration: 200 },
       });
       const decoder = new prism.opus.Decoder({ rate: 48000, channels: 2, frameSize: 960 });
       opus.pipe(decoder);
-      decoder.on("data", (chunk: Buffer) => this.onUserAudio(chunk));
+      let frames = 0;
+      decoder.on("data", (chunk: Buffer) => {
+        if (frames === 0) log.info(`  ↳ decoding ${userId}'s audio`);
+        frames++;
+        this.onUserAudio(chunk);
+      });
 
-      const cleanup = () => active.delete(userId);
+      const cleanup = () => {
+        active.delete(userId);
+        log.debug(`stopped hearing ${userId} (${frames} frames)`);
+      };
       opus.on("end", cleanup);
       opus.on("close", cleanup);
-      decoder.on("error", cleanup);
+      decoder.on("error", (e) => {
+        log.warn(`decode error from ${userId}: ${(e as Error).message}`);
+        cleanup();
+      });
     });
+    log.info("listening for voice (speak in the channel to test receive)");
   }
 
   private startPlayback(): void {
