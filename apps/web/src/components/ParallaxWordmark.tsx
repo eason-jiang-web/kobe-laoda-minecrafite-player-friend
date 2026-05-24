@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { wordmark } from "@/lib/content";
-import { Arrow } from "@/components/Arrow";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -19,7 +18,9 @@ if (typeof window !== "undefined") {
 export function ParallaxWordmark() {
   const root = useRef<HTMLDivElement>(null);
   const left = useRef<HTMLSpanElement>(null);
+  const dot = useRef<HTMLSpanElement>(null);
   const right = useRef<HTMLSpanElement>(null);
+  const registered = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -32,8 +33,8 @@ export function ParallaxWordmark() {
         },
       });
       tween
-        .fromTo(left.current, { xPercent: -40, opacity: 0.3 }, { xPercent: 0, opacity: 1, ease: "none" }, 0)
-        .fromTo(right.current, { xPercent: 40, opacity: 0.3 }, { xPercent: 0, opacity: 1, ease: "none" }, 0);
+        .fromTo([left.current, dot.current], { xPercent: -40 }, { xPercent: 0, ease: "none" }, 0)
+        .fromTo([right.current, registered.current], { xPercent: 40 }, { xPercent: 0, ease: "none" }, 0);
     }, root);
     return () => ctx.revert();
   }, []);
@@ -41,22 +42,32 @@ export function ParallaxWordmark() {
   return (
     <div
       ref={root}
-      className="flex w-full items-end justify-between leading-none text-white"
+      className="relative h-full w-full leading-none text-white"
     >
       <span
         ref={left}
-        className="font-display text-display font-light leading-[0.8] tracking-tightest"
+        className="absolute left-5 top-0 font-display text-[160px] font-light leading-[0.8] tracking-[-0.05em]"
       >
         {wordmark[0]}
       </span>
       <span
+        ref={dot}
+        className="absolute left-[360px] top-0 font-display text-[160px] font-light leading-[0.8] tracking-[-0.05em]"
+      >
+        .
+      </span>
+      <span
         ref={right}
-        className="flex items-start font-display text-display font-light leading-[0.8] tracking-tightest"
+        className="absolute left-1/2 top-0 font-display text-[160px] font-light leading-[0.8] tracking-[-0.05em]"
       >
         {wordmark[1]}
-        <sup className="ml-2 mt-3 text-2xl md:text-4xl">®</sup>
       </span>
-      <Arrow className="absolute right-[10px] top-[14px] h-10 w-10 text-white md:right-5 md:top-5 md:h-16 md:w-16" />
+      <span
+        ref={registered}
+        className="absolute right-5 top-0 font-display text-[160px] font-light leading-[0.8] tracking-[-0.05em]"
+      >
+        ®
+      </span>
     </div>
   );
 }
