@@ -1,18 +1,29 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
- * Scroll-reveal wrapper. Uses IntersectionObserver (not a scroll listener) so it
- * fires reliably under Playwright/headed capture — a port gotcha called out in
- * PLAYBOOK §5. Holds opacity at 0.001 (not 0) to keep the GPU compositing layer
- * alive, matching Framer's own trick and avoiding a paint pop on reveal.
+ * Scroll-reveal wrapper — matches the MEASURED wideangles entrance behavior
+ * (reference/wideangles/motion/appear-effects.json):
+ *
+ *   transform: translateY(20px|60px) -> translateY(0)
+ *   opacity:   held at 1 (NO fade) — Framer animates transform only
+ *   ease:      expo-out, will-change: transform
+ *
+ * The original does a clean SLIDE-UP, not a fade. Fading made our reveals feel
+ * mushy/generic; this is the crisp framer-tier slide. Use y=60 for big section
+ * blocks (headers), y=20 for text/labels (the two distances the site uses).
+ *
+ * React owns the shown state (a re-render can't clobber it back to hidden — that
+ * race once froze the clip tiles). IntersectionObserver is reliable under headed
+ * capture (PLAYBOOK §5); reduced-motion shows instantly; a safety timeout means
+ * content can never stay stuck off-screen.
  */
 export function Reveal({
   children,
   className = "",
   delay = 0,
-  y = 24,
+  y = 20,
   as: Tag = "div",
 }: {
   children?: React.ReactNode;
@@ -22,43 +33,35 @@ export function Reveal({
   as?: keyof JSX.IntrinsicElements;
 }) {
   const ref = useRef<HTMLElement>(null);
+  const [shown, setShown] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
-    const show = () => {
-      el.style.transitionDelay = `${delay}s`;
-      el.style.opacity = "1";
-      el.style.transform = "translateY(0)";
-    };
-
-    // Reduced motion: show instantly, no slide.
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      el.style.transition = "none";
-      show();
+      setShown(true);
       return;
     }
 
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          show();
+          setShown(true);
           io.disconnect();
         }
       },
-      { threshold: 0.1, rootMargin: "-8% 0px" },
+      { threshold: 0.05, rootMargin: "0px 0px -5% 0px" },
     );
     io.observe(el);
 
-    // Safety net: never leave content permanently invisible if IO never fires.
-    const fallback = window.setTimeout(show, 2500);
+    const fallback = window.setTimeout(() => setShown(true), 2000);
 
     return () => {
       io.disconnect();
       window.clearTimeout(fallback);
     };
-  }, [delay]);
+  }, []);
 
   const Component = Tag as React.ElementType;
   return (
@@ -66,10 +69,11 @@ export function Reveal({
       ref={ref}
       className={className}
       style={{
-        opacity: 0.001,
-        transform: `translateY(${y}px)`,
-        transition: "opacity 1s cubic-bezier(0.16,1,0.3,1), transform 1s cubic-bezier(0.16,1,0.3,1)",
-        willChange: "opacity, transform",
+        // transform-only reveal, like the source. opacity holds at 1.
+        transform: shown ? "translateY(0)" : `translateY(${y}px)`,
+        transition: "transform 0.9s cubic-bezier(0.16,1,0.3,1)",
+        transitionDelay: shown ? `${delay}s` : "0s",
+        willChange: "transform",
       }}
     >
       {children}

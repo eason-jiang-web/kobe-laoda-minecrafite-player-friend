@@ -4,34 +4,45 @@ import { clips } from "@/lib/content";
 import { Reveal } from "@/components/Reveal";
 
 /**
- * 02 — Clips (source: "Latest"). Big thin display header + count, then an
- * editorial grid of gameplay thumbnails with 11px mono captions (title / mode /
- * date). Source uses videos; we render captioned tiles (assets are stand-ins —
- * 6/12 source videos failed magic-byte validation on capture).
+ * 02 — Clips (source: "Latest"). Verified against the LIVE site at 1440:
+ *  - big "LATEST 5" header, then 2 large tiles per row, full-bleed, ~no gap
+ *  - tiles are tall & cinematic (each ~half viewport), dominating the section
+ *  - caption band under each tile: title (ink) + studio (muted) stacked on the
+ *    LEFT, date pushed to the far RIGHT — not a cramped inline row
+ * Tiles are video stand-ins (6/12 source videos failed magic-byte on capture).
  */
 export function Clips() {
   return (
-    <section id="clips" className="bg-canvas px-[10px] py-24 md:px-5 md:py-32">
-      <div className="mb-12 flex items-end justify-between">
-        <h2 className="font-display text-display font-light leading-[0.85] tracking-tightest text-ink">
+    <section id="clips" className="bg-canvas px-[10px] pb-16 pt-16 md:px-5 md:pb-20 md:pt-20">
+      <Reveal y={60} className="mb-5 flex items-end justify-between md:mb-6">
+        <h2 className="font-display text-[clamp(56px,9vw,120px)] font-light leading-[0.82] tracking-tightest text-ink">
           clips
         </h2>
-        <span className="font-display text-display font-light leading-[0.85] text-ink">
+        <span className="font-display text-[clamp(56px,9vw,120px)] font-light leading-[0.82] text-ink">
           {clips.length}
         </span>
-      </div>
+      </Reveal>
 
-      <div className="grid grid-cols-2 gap-[10px] md:grid-cols-3 lg:grid-cols-3">
+      {/* 2-up, full-bleed, minimal gap — matches the live grid proportions */}
+      <div className="grid grid-cols-1 gap-x-[6px] gap-y-10 md:grid-cols-2">
         {clips.map((clip, i) => (
-          <Reveal key={clip.title} delay={(i % 3) * 0.06} className="group">
-            <div className="relative aspect-[4/3] w-full overflow-hidden bg-ink">
-              <div className="absolute inset-0 grid place-items-center opacity-30 transition-opacity duration-500 group-hover:opacity-50">
-                <span className="font-display text-7xl text-white/60">{i + 1}</span>
-              </div>
+          <Reveal key={clip.title} delay={(i % 2) * 0.08} className="group">
+            <div className="relative aspect-[16/10] w-full overflow-hidden bg-ink">
+              <video
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                src="/video/hero.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
             </div>
-            <div className="mt-2 flex items-baseline justify-between gap-2">
-              <span className="u-label text-ink">{clip.title}</span>
-              <span className="u-label text-muted">{clip.who}</span>
+            {/* caption band: title + studio stacked left, date far right */}
+            <div className="mt-3 flex items-start justify-between">
+              <div className="flex flex-col gap-[2px]">
+                <span className="u-label text-ink">{clip.title}</span>
+                <span className="u-label text-muted">{clip.who}</span>
+              </div>
               <span className="u-label text-ink">{clip.date}</span>
             </div>
           </Reveal>

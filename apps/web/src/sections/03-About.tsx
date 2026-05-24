@@ -41,13 +41,13 @@ export function About() {
         ))}
       </div>
 
-      {/* giant word + arrow */}
-      <div className="mt-20 flex items-end justify-between md:mt-32">
+      {/* giant word + arrow — y=60 big-block slide like the source */}
+      <Reveal y={60} className="mt-20 flex items-end justify-between md:mt-32">
         <h2 className="font-display text-display font-light leading-[0.8] tracking-tightest text-ink">
           about
         </h2>
         <Arrow className="h-24 w-24 text-ink md:h-40 md:w-40 lg:h-56 lg:w-56" />
-      </div>
+      </Reveal>
     </section>
   );
 }

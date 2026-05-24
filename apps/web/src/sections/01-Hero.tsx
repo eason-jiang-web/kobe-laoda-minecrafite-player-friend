@@ -1,31 +1,26 @@
 "use client";
 
-import { brand } from "@/lib/content";
-
 /**
- * 01 — Hero. Full-bleed cinematic background with floating micro-labels in the
- * corners and a "scroll down" cue centered at the bottom. In the source this is a
- * looping video; we use the one clean captured clip as a tasteful stand-in behind
- * a dark scrim. The PinnedFrame (brand/nav/email) overlays this from the layout.
+ * 01 — Hero. Full-bleed cinematic loop: an AI agent HUD scanning a Minecraft
+ * world (taiga, lake, cozy cabin at golden hour). The footage already carries the
+ * visual story — agent swarm status, planned route, action queue — so the scrim
+ * stays light and we don't overlay extra labels that would fight the HUD. The
+ * PinnedFrame (brand/nav/email corners) sits on top from the layout.
  */
 export function Hero() {
   return (
     <section id="hero" className="relative h-[100svh] w-full overflow-hidden bg-ink">
       <video
         className="absolute inset-0 h-full w-full object-cover"
-        src="/video/banner.mp4"
+        src="/video/hero.mp4"
         autoPlay
         muted
         loop
         playsInline
       />
-      <div className="absolute inset-0 bg-black/20" />
-
-      {/* center mid labels (client/credit style) */}
-      <div className="absolute inset-0 flex items-center justify-between px-[10px] text-white md:px-5">
-        <span className="u-label max-w-[140px]">{brand.tagline}</span>
-        <span className="u-label max-w-[140px] text-right">spawns next to you</span>
-      </div>
+      {/* light scrim: just enough to keep the pinned-frame corners legible
+          without burying the HUD */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/30" />
 
       {/* scroll cue */}
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 text-white">
