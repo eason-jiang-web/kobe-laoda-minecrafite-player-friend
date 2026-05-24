@@ -33,3 +33,9 @@ worlds/
 
 # hermes lives OUTSIDE this repo, but just in case someone clones it here
 hermes/
+
+# extract-site reference captures (regenerable build inputs, large/binary)
+apps/web/reference/
+
+# agent working notes
+tasks/
