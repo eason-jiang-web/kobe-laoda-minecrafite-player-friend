@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
+import { gsap } from "gsap";
+import { HoverLink } from "@/components/HoverLink";
 import { brand, nav } from "@/lib/content";
 
 /**
@@ -9,36 +11,51 @@ import { brand, nav } from "@/lib/content";
  * canvas sections, so it mostly disappears there and stays visible on footage.
  */
 export function PinnedFrame() {
-  const [shown, setShown] = useState(false);
+  const root = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setShown(true));
-    return () => window.cancelAnimationFrame(frame);
+    const el = root.current;
+    if (!el) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      gsap.set(el, { y: 0 });
+      return;
+    }
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        el,
+        { y: -50 },
+        { y: 0, duration: 0.9, ease: "expo.out", overwrite: true },
+      );
+    }, root);
+
+    return () => ctx.revert();
   }, []);
 
   return (
     <header
+      ref={root}
       className="pointer-events-none fixed left-0 top-0 z-50 hidden h-[50px] w-full md:block"
       style={{
-        transform: shown ? "translateY(0)" : "translateY(-50px)",
-        transition: "transform 0.9s cubic-bezier(0.16,1,0.3,1)",
+        transform: "translateY(-50px)",
         willChange: "transform",
       }}
     >
       <div className="relative h-full w-full text-white">
-        <a
+        <HoverLink
           href="#top"
-          className="u-label pointer-events-auto absolute left-5 top-5 hover:opacity-60"
+          className="u-label pointer-events-auto absolute left-5 top-5"
         >
           {brand.mark}
-        </a>
+        </HoverLink>
 
         <nav className="u-label pointer-events-auto absolute left-5 top-[35px] flex items-center gap-[5px]">
           {nav.map((item, index) => (
             <span key={item.href} className="flex items-center gap-[5px]">
-              <a href={item.href} className="hover:opacity-60">
+              <HoverLink href={item.href}>
                 {item.label}
-              </a>
+              </HoverLink>
               {index < nav.length - 1 ? <span>/</span> : null}
             </span>
           ))}
@@ -51,16 +68,16 @@ export function PinnedFrame() {
         </div>
 
         <div className="u-label absolute left-[50.35%] top-5">
-          <a
+          <HoverLink
             href={`mailto:${brand.email}`}
-            className="pointer-events-auto hover:opacity-60"
+            className="pointer-events-auto"
           >
             {brand.email}
-          </a>
+          </HoverLink>
           <br />
-          <a href="#cta" className="pointer-events-auto hover:opacity-60">
+          <HoverLink href="#cta" className="pointer-events-auto">
             early access
-          </a>
+          </HoverLink>
         </div>
 
         <div className="u-label absolute left-[74.5%] top-5">

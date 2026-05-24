@@ -1,23 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 /**
- * Scroll-reveal wrapper — matches the MEASURED wideangles entrance behavior
- * (reference/wideangles/motion/appear-effects.json):
- *
- *   transform: translateY(20px|60px) -> translateY(0)
- *   opacity:   held at 1 (NO fade) — Framer animates transform only
- *   ease:      expo-out, will-change: transform
- *
- * The original does a clean SLIDE-UP, not a fade. Fading made our reveals feel
- * mushy/generic; this is the crisp framer-tier slide. Use y=60 for big section
- * blocks (headers), y=20 for text/labels (the two distances the site uses).
- *
- * React owns the shown state (a re-render can't clobber it back to hidden — that
- * race once froze the clip tiles). IntersectionObserver is reliable under headed
- * capture (PLAYBOOK §5); reduced-motion shows instantly; a safety timeout means
- * content can never stay stuck off-screen.
+ * Scroll-reveal wrapper — matches the measured wideangles entrance behavior:
+ * transform-only translateY(20px|60px) -> 0, opacity held at 1.
  */
 export function Reveal({
   children,
@@ -33,35 +26,66 @@ export function Reveal({
   as?: keyof JSX.IntrinsicElements;
 }) {
   const ref = useRef<HTMLElement>(null);
-  const [shown, setShown] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setShown(true);
+      gsap.set(el, { y: 0, clearProps: "willChange" });
       return;
     }
 
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setShown(true);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.05, rootMargin: "0px 0px -5% 0px" },
-    );
-    io.observe(el);
+    let played = false;
+    const ctx = gsap.context(() => {
+      gsap.set(el, { y, opacity: 1, willChange: "transform" });
 
-    const fallback = window.setTimeout(() => setShown(true), 2000);
+      const tween = gsap.to(el, {
+        y: 0,
+        duration: 0.9,
+        delay,
+        ease: "expo.out",
+        paused: true,
+        overwrite: true,
+        onComplete: () => gsap.set(el, { willChange: "auto" }),
+      });
+
+      const play = () => {
+        if (played) return;
+        played = true;
+        tween.play(0);
+      };
+
+      ScrollTrigger.create({
+        trigger: el,
+        start: "top bottom",
+        once: true,
+        onEnter: play,
+        onRefresh: (self) => {
+          if (self.isActive || el.getBoundingClientRect().top < window.innerHeight) {
+            play();
+          }
+        },
+      });
+
+      if (el.getBoundingClientRect().top < window.innerHeight) {
+        play();
+      }
+    }, ref);
+
+    const fallback = window.setTimeout(() => {
+      if (!played) {
+        gsap.to(el, { y: 0, duration: 0.6, ease: "expo.out" });
+      }
+    }, 2000);
+
+    document.fonts?.ready.then(() => ScrollTrigger.refresh());
 
     return () => {
-      io.disconnect();
       window.clearTimeout(fallback);
+      ctx.revert();
     };
-  }, []);
+  }, [delay, y]);
 
   const Component = Tag as React.ElementType;
   return (
@@ -69,10 +93,8 @@ export function Reveal({
       ref={ref}
       className={className}
       style={{
-        // transform-only reveal, like the source. opacity holds at 1.
-        transform: shown ? "translateY(0)" : `translateY(${y}px)`,
-        transition: "transform 0.9s cubic-bezier(0.16,1,0.3,1)",
-        transitionDelay: shown ? `${delay}s` : "0s",
+        transform: `translateY(${y}px)`,
+        opacity: 1,
         willChange: "transform",
       }}
     >

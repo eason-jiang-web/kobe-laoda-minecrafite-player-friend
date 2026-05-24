@@ -1,6 +1,7 @@
 "use client";
 
 import { clips } from "@/lib/content";
+import { ClipHoverCard } from "@/components/ClipHoverCard";
 import { Reveal } from "@/components/Reveal";
 
 /**
@@ -24,50 +25,26 @@ export function Clips() {
 
       <div className="grid grid-cols-1 md:grid-cols-2">
         {featureClips.map((clip, i) => (
-          <Reveal key={clip.title} delay={i * 0.08} className="group">
-            <div className="relative h-[436px] w-full overflow-hidden bg-ink">
-              <video
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                src="/video/hero.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-              />
-            </div>
-            <div className="grid h-[41px] grid-cols-2 px-5 pt-3">
-              <div>
-                <span className="u-label text-ink">{clip.title}</span>
-                <br />
-                <span className="u-label text-muted">{clip.who}</span>
-              </div>
-              <span className="u-label text-ink">{clip.date}</span>
-            </div>
+          <Reveal key={clip.title} delay={i * 0.08}>
+            <ClipHoverCard
+              title={clip.title}
+              who={clip.who}
+              date={clip.date}
+              mediaClassName="h-[436px] w-full"
+            />
           </Reveal>
         ))}
       </div>
 
       <div className="mt-[52px] grid grid-cols-1 md:grid-cols-3">
         {smallClips.map((clip, i) => (
-          <Reveal key={clip.title} delay={i * 0.06} className="group">
-            <div className="relative h-[291px] w-full overflow-hidden bg-ink">
-              <video
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                src="/video/hero.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-              />
-            </div>
-            <div className="grid h-[41px] grid-cols-2 px-5 pt-3">
-              <div>
-                <span className="u-label text-ink">{clip.title}</span>
-                <br />
-                <span className="u-label text-muted">{clip.who}</span>
-              </div>
-              <span className="u-label text-ink">{clip.date}</span>
-            </div>
+          <Reveal key={clip.title} delay={i * 0.06}>
+            <ClipHoverCard
+              title={clip.title}
+              who={clip.who}
+              date={clip.date}
+              mediaClassName="h-[291px] w-full"
+            />
           </Reveal>
         ))}
       </div>

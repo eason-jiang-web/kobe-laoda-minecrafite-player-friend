@@ -1,21 +1,28 @@
+import { HoverLink } from "@/components/HoverLink";
 import { brand, nav, worksWith } from "@/lib/content";
 
 const footerColumns = [
   {
     title: "navigation",
-    links: nav.map((item) => item.label),
+    links: nav.map((item) => ({ label: item.label, href: item.href })),
   },
   {
     title: "contacts",
-    links: [brand.email, "discord voice"],
+    links: [
+      { label: brand.email, href: `mailto:${brand.email}` },
+      { label: "discord voice" },
+    ],
   },
   {
     title: "runs on",
-    links: worksWith.slice(0, 3),
+    links: worksWith.slice(0, 3).map((label) => ({ label })),
   },
   {
     title: "status",
-    links: ["early access", "co-op ai"],
+    links: [
+      { label: "early access", href: "#cta" },
+      { label: "co-op ai" },
+    ],
   },
 ];
 
@@ -49,8 +56,12 @@ export function FooterReveal() {
               <p className="u-label mb-[24px] text-muted">{column.title}</p>
               <ul>
                 {column.links.map((link) => (
-                  <li key={link} className="u-label text-ink">
-                    {link}
+                  <li key={link.label} className="u-label text-ink">
+                    {link.href ? (
+                      <HoverLink href={link.href}>{link.label}</HoverLink>
+                    ) : (
+                      link.label
+                    )}
                   </li>
                 ))}
               </ul>

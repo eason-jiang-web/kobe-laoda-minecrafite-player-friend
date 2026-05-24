@@ -46,24 +46,28 @@ export function ParallaxWordmark() {
     >
       <span
         ref={left}
+        data-wordmark-part="left"
         className="absolute left-5 top-0 font-display text-[160px] font-light leading-[0.8] tracking-normal"
       >
         {wordmark[0]}
       </span>
       <span
         ref={dot}
+        data-wordmark-part="dot"
         className="absolute left-[360px] top-0 font-display text-[160px] font-light leading-[0.8] tracking-normal"
       >
         .
       </span>
       <span
         ref={right}
+        data-wordmark-part="right"
         className="absolute left-1/2 top-0 font-display text-[160px] font-light leading-[0.8] tracking-normal"
       >
         {wordmark[1]}
       </span>
       <span
         ref={registered}
+        data-wordmark-part="registered"
         className="absolute right-5 top-0 font-display text-[160px] font-light leading-[0.8] tracking-normal"
       >
         ®
