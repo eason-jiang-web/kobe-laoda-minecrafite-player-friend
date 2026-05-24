@@ -148,3 +148,11 @@ export const SetGoalInput = z.object({
 });
 
 export type SetGoalInputT = z.infer<typeof SetGoalInput>;
+
+// ── Voice (jabby → spoken in the Discord call) ──
+
+export const SpeakInput = z.object({
+  text: z.string().describe("Short, casual, lowercase line to say OUT LOUD in the voice call (different from in-game chat)."),
+});
+
+export type SpeakInputT = z.infer<typeof SpeakInput>;

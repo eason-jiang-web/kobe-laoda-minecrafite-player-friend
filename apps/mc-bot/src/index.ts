@@ -12,6 +12,7 @@ import { registerSkillTools, runSkillByName } from "./skills/index.js";
 import type { SkillContext } from "./skills/types.js";
 import { WorldMemory } from "./memory/store.js";
 import { registerMemoryTools } from "./memory/tools.js";
+import { registerVoiceTools } from "./voice/tools.js";
 import { pushChat } from "./state/extract.js";
 import { setLogLevel, logger } from "./util/logger.js";
 
@@ -93,6 +94,7 @@ async function main() {
     registerSkillTools(mcp, skillCtx);
     registerMemoryTools(mcp, memory, controller);
     registerGoalTools(mcp, runner);
+    registerVoiceTools(mcp);
     return mcp;
   };
 

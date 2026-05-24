@@ -27,6 +27,7 @@ export class Bridge {
   private lastSeenGoalId: string | null = null;
   private lastBrainAt = 0;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private speechTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly cfg: VoiceConfig) {
     this.mc = new McClient(cfg.mcpUrl);
@@ -58,12 +59,34 @@ export class Bridge {
     await this.voice.join(guild, this.cfg.discord.voiceChannelId);
     await this.eleven.start();
     this.startContextPoll();
+    this.startSpeechPoll();
   }
 
   stop(): void {
     if (this.pollTimer) clearInterval(this.pollTimer);
+    if (this.speechTimer) clearInterval(this.speechTimer);
     this.eleven?.close();
     this.voice?.leave();
+  }
+
+  /**
+   * Fast poll for lines jabby queued via the `speak` tool, and voice them. This
+   * is how the brain talks in the call: jabby decides what to say, we feed it to
+   * ElevenLabs as a high-priority note to voice right away. Faster than the 5s
+   * context poll so spoken replies feel live.
+   */
+  private startSpeechPoll(): void {
+    this.speechTimer = setInterval(async () => {
+      try {
+        if (!this.mc.connected) return;
+        const lines = await this.mc.drainSpeech();
+        for (const line of lines) {
+          this.eleven?.sendContext(`[say this out loud now, casually, as-is]: ${line}`);
+        }
+      } catch {
+        /* bot offline; ignore */
+      }
+    }, 1200);
   }
 
   // ── agent tool calls → Minecraft bot ──

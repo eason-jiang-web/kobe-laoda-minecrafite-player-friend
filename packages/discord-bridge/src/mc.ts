@@ -69,6 +69,22 @@ export class McClient {
     return JSON.parse(text) as GameState;
   }
 
+  /** Drain lines the brain queued to be spoken out loud (returns + clears). */
+  async drainSpeech(): Promise<string[]> {
+    const res = await this.ensure().callTool({ name: "drain_speech", arguments: {} });
+    const content = Array.isArray(res.content) ? res.content : [];
+    const text = content
+      .filter((c): c is { type: "text"; text: string } => c.type === "text")
+      .map((c) => c.text)
+      .join("");
+    try {
+      const env = JSON.parse(text) as { data?: unknown };
+      return Array.isArray(env.data) ? (env.data as string[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
   private async call(name: string, args: Record<string, unknown>): Promise<string> {
     const res = await this.ensure().callTool({ name, arguments: args });
     const content = Array.isArray(res.content) ? res.content : [];
