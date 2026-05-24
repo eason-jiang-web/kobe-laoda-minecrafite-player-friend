@@ -51,9 +51,25 @@ export function resampleMono(buf: Buffer, inRate: number, outRate: number): Buff
   return out;
 }
 
+/** Average-decimate mono 16-bit PCM by an integer factor (crude anti-alias low-pass). */
+function decimateAvg(buf: Buffer, factor: number): Buffer {
+  const inSamples = buf.length / 2;
+  const outSamples = Math.floor(inSamples / factor);
+  const out = Buffer.allocUnsafe(outSamples * 2);
+  for (let i = 0; i < outSamples; i++) {
+    let sum = 0;
+    for (let j = 0; j < factor; j++) sum += buf.readInt16LE((i * factor + j) * 2);
+    out.writeInt16LE(Math.round(sum / factor), i * 2);
+  }
+  return out;
+}
+
 /** Discord (48k stereo) -> ElevenLabs (mono at `outRate`, default 16k). */
 export function discordToEleven(pcm48Stereo: Buffer, outRate = 16000): Buffer {
-  return resampleMono(stereoToMono(pcm48Stereo), 48000, outRate);
+  const mono = stereoToMono(pcm48Stereo);
+  // 48k -> 16k is exactly 3:1 — average each triplet (cleaner than linear decimation).
+  if (outRate === 16000) return decimateAvg(mono, 3);
+  return resampleMono(mono, 48000, outRate);
 }
 
 /** ElevenLabs (mono at `inRate`, default 16k) -> Discord (48k stereo). */

@@ -4,6 +4,7 @@ import {
   createAudioPlayer,
   createAudioResource,
   StreamType,
+  NoSubscriberBehavior,
   entersState,
   VoiceConnectionStatus,
   type VoiceConnection,
@@ -22,10 +23,19 @@ const log = logger("voice");
  * one callback — v1 is conversational with the whole room (no per-speaker
  * separation).
  */
+/** 20ms of 48kHz 16-bit stereo PCM = 48000 * 0.02 * 2ch * 2bytes. */
+const FRAME_BYTES = 3840;
+const SILENCE = Buffer.alloc(FRAME_BYTES);
+
 export class VoiceHub {
   private connection: VoiceConnection | null = null;
-  private readonly player: AudioPlayer = createAudioPlayer();
+  private readonly player: AudioPlayer = createAudioPlayer({
+    behaviors: { noSubscriber: NoSubscriberBehavior.Play },
+  });
   private playStream: PassThrough | null = null;
+  /** Agent PCM (48k stereo) waiting to be played, drained 20ms at a time. */
+  private pending = Buffer.alloc(0);
+  private feedTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly onUserAudio: (pcm48Stereo: Buffer) => void) {}
 
@@ -66,20 +76,19 @@ export class VoiceHub {
     log.info(`✅ joined voice channel ${channelId}`);
   }
 
-  /** Play agent audio (48kHz stereo PCM) into the VC. */
+  /** Queue agent audio (48kHz stereo PCM) for playback. */
   play(pcm48Stereo: Buffer): void {
-    if (!this.playStream) this.startPlayback();
-    this.playStream!.write(pcm48Stereo);
+    this.pending = Buffer.concat([this.pending, pcm48Stereo]);
   }
 
-  /** Drop any queued agent audio (on interruption / barge-in). */
+  /** Drop queued agent audio (on interruption / barge-in). Keeps the stream alive. */
   flush(): void {
-    this.player.stop(true);
-    this.playStream?.end();
-    this.startPlayback();
+    this.pending = Buffer.alloc(0);
   }
 
   leave(): void {
+    if (this.feedTimer) clearInterval(this.feedTimer);
+    this.feedTimer = null;
     this.connection?.destroy();
     this.connection = null;
   }
@@ -122,8 +131,28 @@ export class VoiceHub {
   }
 
   private startPlayback(): void {
-    this.playStream = new PassThrough();
+    // One long-lived Raw PCM stream. A 20ms clock writes either queued agent
+    // audio or silence — so the stream never underruns and the player never goes
+    // idle (which was dropping every utterance after the first).
+    this.playStream = new PassThrough({ highWaterMark: FRAME_BYTES * 16 });
     const resource = createAudioResource(this.playStream, { inputType: StreamType.Raw });
     this.player.play(resource);
+    for (let i = 0; i < 3; i++) this.playStream.write(SILENCE); // ~60ms cushion vs timer drift
+
+    if (this.feedTimer) clearInterval(this.feedTimer);
+    this.feedTimer = setInterval(() => {
+      if (!this.playStream) return;
+      let frame: Buffer;
+      if (this.pending.length >= FRAME_BYTES) {
+        frame = this.pending.subarray(0, FRAME_BYTES);
+        this.pending = this.pending.subarray(FRAME_BYTES);
+      } else if (this.pending.length > 0) {
+        frame = Buffer.concat([this.pending, SILENCE.subarray(this.pending.length)]);
+        this.pending = Buffer.alloc(0);
+      } else {
+        frame = SILENCE;
+      }
+      this.playStream.write(frame);
+    }, 20);
   }
 }
