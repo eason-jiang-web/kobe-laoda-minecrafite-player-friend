@@ -11,7 +11,7 @@ export function Banner() {
   return (
     <section className="relative h-[100svh] w-full overflow-hidden bg-ink">
       <video
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full scale-[1.015] object-cover blur-[2px]"
         src="/video/hero.mp4"
         autoPlay
         muted

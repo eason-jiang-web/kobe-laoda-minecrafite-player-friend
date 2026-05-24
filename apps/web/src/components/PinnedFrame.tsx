@@ -45,7 +45,7 @@ export function PinnedFrame() {
       <div className="relative h-full w-full text-white">
         <HoverLink
           href="#top"
-          className="u-label pointer-events-auto absolute left-5 top-5"
+          className="u-label pointer-events-auto absolute left-5 top-4"
         >
           {brand.mark}
         </HoverLink>

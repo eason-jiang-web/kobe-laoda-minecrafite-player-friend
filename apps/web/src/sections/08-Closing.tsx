@@ -32,10 +32,6 @@ export function Closing() {
       <div className="pointer-events-none absolute bottom-5 left-5 h-2 w-2 border-b border-l border-white" />
       <div className="pointer-events-none absolute bottom-5 right-5 h-2 w-2 border-b border-r border-white" />
 
-      <p className="u-label absolute left-1/2 top-[21px] -translate-x-1/2 text-center">
-        est.
-      </p>
-
       <div className="absolute left-5 right-5 top-[471px] flex h-12 items-center justify-between">
         <p className="u-label text-left">{year.slice(0, 2)}</p>
         <HeaderReveal className="w-[460px] text-center font-sans text-[24px] font-medium uppercase leading-none">
