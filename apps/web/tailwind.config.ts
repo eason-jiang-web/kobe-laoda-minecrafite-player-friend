@@ -28,11 +28,8 @@ const config: Config = {
         // measured from the capture
         label: ["11px", { lineHeight: "1.3", letterSpacing: "0.02em" }],
         meta: ["12px", { lineHeight: "1.4" }],
-        h2: ["24px", { lineHeight: "1.1", letterSpacing: "-0.01em" }],
-        display: ["clamp(64px, 14vw, 200px)", { lineHeight: "0.9", letterSpacing: "-0.03em" }],
-      },
-      letterSpacing: {
-        tightest: "-0.04em",
+        h2: ["24px", { lineHeight: "1.1", letterSpacing: "0" }],
+        display: ["clamp(64px, 14vw, 200px)", { lineHeight: "0.9", letterSpacing: "0" }],
       },
     },
   },

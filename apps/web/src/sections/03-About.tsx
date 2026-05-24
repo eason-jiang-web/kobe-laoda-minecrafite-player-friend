@@ -46,7 +46,7 @@ export function About() {
         y={60}
         className="mt-[49px] flex h-40 items-center justify-between text-ink no-underline"
       >
-        <h2 className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-[-0.05em] text-ink">
+        <h2 className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-normal text-ink">
           about
         </h2>
         <Arrow className="h-40 w-40 shrink-0 text-ink" />

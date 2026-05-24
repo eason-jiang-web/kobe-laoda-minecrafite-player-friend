@@ -14,10 +14,10 @@ export function Clips() {
   return (
     <section id="clips" className="overflow-hidden bg-canvas pb-px pt-24">
       <Reveal y={60} className="mb-[62px] flex h-32 items-start justify-between px-[10px] md:px-5">
-        <h2 className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-[-0.05em] text-ink">
+        <h2 className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-normal text-ink">
           clips
         </h2>
-        <span className="font-display text-[160px] font-light leading-[0.8] tracking-[-0.05em] text-ink">
+        <span className="font-display text-[160px] font-light leading-[0.8] tracking-normal text-ink">
           {clips.length}
         </span>
       </Reveal>
