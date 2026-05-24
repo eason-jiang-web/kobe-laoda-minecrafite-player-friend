@@ -24,6 +24,7 @@ export class Bridge {
   private voice: VoiceHub | null = null;
   private prev: GameState | null = null;
   private lastChatAt = 0;
+  private lastSeenGoalId: string | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly cfg: VoiceConfig) {
@@ -72,9 +73,18 @@ export class Bridge {
         case "minecraft_say":
           await this.mc.say(String(params.message ?? ""));
           return; // expects_response: false
-        case "minecraft_run_skill": {
+        case "minecraft_set_goal": {
+          // non-blocking: kick off the task, ack immediately. Completion comes
+          // back through deriveContext (lastGoal) as a spoken-friendly note.
           const args = parseArgs(params.args);
-          const res = await this.mc.runSkill(String(params.skill ?? ""), args);
+          const res = await this.mc.setGoal(String(params.task ?? params.skill ?? ""), args);
+          this.eleven?.sendToolResult(id, res);
+          return;
+        }
+        case "minecraft_run_skill": {
+          // kept for back-compat: route through set_goal so it never blocks.
+          const args = parseArgs(params.args);
+          const res = await this.mc.setGoal(String(params.skill ?? ""), args);
           this.eleven?.sendToolResult(id, res);
           return;
         }
@@ -125,6 +135,14 @@ export class Bridge {
     const prevIds = new Set((this.prev?.nearbyHostiles ?? []).map((h) => h.id));
     for (const h of s.nearbyHostiles) {
       if (!prevIds.has(h.id) && h.distance < 12) lines.push(`a ${h.name} just showed up ~${h.distance} blocks away`);
+    }
+
+    // a background task (set_goal) just finished — so itto can react out loud
+    const lg = s.lastGoal;
+    if (lg && lg.id !== this.lastSeenGoalId) {
+      this.lastSeenGoalId = lg.id;
+      const detail = lg.status === "failed" ? `couldn't ${lg.label}` : `done: ${lg.label}${lg.progress ? ` — ${lg.progress}` : ""}`;
+      lines.push(detail);
     }
 
     return lines.length ? `[game] ${lines.join(" | ")}` : null;

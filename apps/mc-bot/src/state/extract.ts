@@ -87,5 +87,6 @@ export function extractGameState(bot: Bot, ownerUsername: string): GameState {
     inventory: bot.inventory.items().map((i) => ({ name: i.name, count: i.count })),
     followState: "IDLE", // overwritten by the fast loop's follow SM each tick
     currentGoal: null, // stamped by the goal runner each tick (see index.ts)
+    lastGoal: null, // stamped by the goal runner each tick (see index.ts)
   };
 }

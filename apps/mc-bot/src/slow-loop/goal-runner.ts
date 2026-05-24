@@ -25,6 +25,8 @@ export interface GoalRunnerDeps {
 export class GoalRunner {
   private current: BotGoal | null = null;
   private queue: BotGoal[] = [];
+  /** Most recently finished goal — for pollers (voice bridge) to read. */
+  private lastFinished: BotGoal | null = null;
   /** True while a skill/say is awaiting — stops us re-launching it every tick. */
   private inflight = false;
 
@@ -57,6 +59,11 @@ export class GoalRunner {
 
   currentGoal(): BotGoal | null {
     return this.current;
+  }
+
+  /** The last goal that finished (done/failed). Lingers for state pollers. */
+  lastGoalFinished(): BotGoal | null {
+    return this.lastFinished;
   }
 
   /** Advance the current goal one step. Called every slow-loop tick. */
@@ -117,6 +124,7 @@ export class GoalRunner {
     goal.status = status;
     goal.updatedAt = Date.now();
     if (error) goal.error = error;
+    this.lastFinished = goal;
     this.inflight = false;
     log.debug(`goal "${goal.label}" → ${status}${error ? ": " + error : ""}`);
 

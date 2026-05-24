@@ -104,6 +104,12 @@ export interface GameState {
   followState: FollowState;
   /** The goal itto is currently pursuing (set by the brain via set_goal), if any. */
   currentGoal: { id: string; label: string; status: GoalStatus; progress?: string } | null;
+  /**
+   * The most recently finished goal. Lingers so out-of-band consumers that poll
+   * state (e.g. the voice bridge) can announce "done" even if they miss the
+   * active→null transition. Dedup by id.
+   */
+  lastGoal?: { id: string; label: string; status: GoalStatus; progress?: string } | null;
 }
 
 /**

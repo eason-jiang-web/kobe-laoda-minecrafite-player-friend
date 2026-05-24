@@ -38,9 +38,20 @@ export class McClient {
     return this.call("chat", { message });
   }
 
-  /** Run a seed skill (follow_player, assist_mining, ...). */
+  /** Run a seed skill synchronously (blocks until done) — for quick skills only. */
   async runSkill(skill: string, args?: Record<string, unknown>): Promise<string> {
     return this.call("run_skill", { name: skill, args });
+  }
+
+  /**
+   * Set a goal (non-blocking): the bot pursues the skill in the background and
+   * reports completion via state (lastGoal). Use for anything that takes a beat
+   * (chop, mine, fetch, scout, build, combat) so the voice tool call doesn't
+   * hang waiting on pathfinding.
+   */
+  async setGoal(skill: string, args?: Record<string, unknown>): Promise<string> {
+    const label = skill.replace(/_/g, " ");
+    return this.call("set_goal", { intent: { kind: "skill", name: skill, args }, label });
   }
 
   /** Compact world snapshot as text (for the get_state tool). */

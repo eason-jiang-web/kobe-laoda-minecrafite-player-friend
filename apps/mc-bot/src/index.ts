@@ -66,10 +66,12 @@ async function main() {
   const origGetState = controller.getState.bind(controller);
   controller.getState = () => {
     const g = runner.currentGoal();
+    const lg = runner.lastGoalFinished();
     return {
       ...origGetState(),
       followState: fast.followState(),
       currentGoal: g ? { id: g.id, label: g.label, status: g.status, progress: g.progress } : null,
+      lastGoal: lg ? { id: lg.id, label: lg.label, status: lg.status, progress: lg.progress } : null,
     };
   };
 

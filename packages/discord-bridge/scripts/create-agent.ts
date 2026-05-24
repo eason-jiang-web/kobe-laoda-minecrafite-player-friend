@@ -32,9 +32,9 @@ You're playing too:
 - When someone asks you to do something in the game — come here, follow, help mine, fight this, scout ahead, build, grab my stuff — actually DO it with your tools. Don't just say you will. A quick "otw" or "on it" after is plenty.
 
 Your tools:
-- minecraft_run_skill: do things in the world. skills: follow_player, assist_mining, combat_assist, fetch_item, scout_ahead, build_helper, inventory_report.
+- minecraft_set_goal: go DO something in the world. tasks: chop_tree (get wood), mine_vein (mine ore — pass {"ore":"diamond_ore"} for a specific one), collect_drops (grab dropped items), combat_assist (fight nearby mobs), fetch_item (bring an item from a chest, pass {"name":"iron_ingot"}), scout_ahead (look around ahead), build_helper (place blocks), follow_player (stick close). It runs in the BACKGROUND — call it, say a quick "on it", and keep talking. You'll get a system note when it finishes; react to that out loud ("aight got the wood"). Never wait silently.
+- minecraft_get_state: check your surroundings — health, the player's distance, nearby mobs, your inventory, recent game chat. Use this to answer "what do you have" or "what's around."
 - minecraft_say: type a line into Minecraft GAME chat (different from talking out loud here). Use it when something belongs in the game chat specifically.
-- minecraft_get_state: check what's around you if you're not sure.
 
 Keep it light, keep it real, keep it short.`;
 
@@ -52,18 +52,22 @@ const toolSpecs = [
   },
   {
     type: "client",
-    name: "minecraft_run_skill",
-    description: "Run an itto skill in the Minecraft world. Use when asked to come/follow, mine, fight mobs, scout, build, fetch an item, or report inventory.",
+    name: "minecraft_set_goal",
+    description: "Have itto go do something in the Minecraft world. It works in the BACKGROUND and you get a system note when it's done — so call this, say a quick 'on it', and keep talking. Don't wait. Use for: get wood, mine ore, fight mobs, fetch an item, scout, build, follow, grab drops.",
     expects_response: true,
     parameters: {
       type: "object",
-      required: ["skill"],
+      required: ["task"],
       properties: {
-        skill: {
+        task: {
           type: "string",
-          description: "one of: follow_player, assist_mining, combat_assist, fetch_item, scout_ahead, build_helper, inventory_report",
+          description:
+            "one of: chop_tree, mine_vein, collect_drops, combat_assist, fetch_item, scout_ahead, build_helper, follow_player",
         },
-        args: { type: "string", description: "optional JSON string of skill args, e.g. {\"name\":\"diamond\"} for fetch_item" },
+        args: {
+          type: "string",
+          description: "optional JSON string of args, e.g. {\"name\":\"iron_ingot\"} for fetch_item or {\"ore\":\"diamond_ore\"} for mine_vein",
+        },
       },
     },
   },
