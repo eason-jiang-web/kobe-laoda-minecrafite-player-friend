@@ -68,13 +68,6 @@ export function PinnedFrame() {
         </div>
 
         <div className="u-label absolute left-[50.35%] top-5">
-          <HoverLink
-            href={`mailto:${brand.email}`}
-            className="pointer-events-auto"
-          >
-            {brand.email}
-          </HoverLink>
-          <br />
           <HoverLink href="#cta" className="pointer-events-auto">
             early access
           </HoverLink>
@@ -82,8 +75,6 @@ export function PinnedFrame() {
 
         <div className="u-label absolute left-[74.5%] top-5">
           est. {brand.year}
-          <br />
-          kalilabs
         </div>
       </div>
     </header>

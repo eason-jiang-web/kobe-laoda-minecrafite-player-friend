@@ -38,6 +38,16 @@ export const clips = [
 export const about = {
   intro:
     "itto joins your Minecraft world, follows you around, helps with tasks, and hangs in your Discord call. Not a coach. Not a tutorial bot. A duo partner.",
+  body: [
+    "The point is presence. itto should feel like another player who notices the little things: when you start mining, when your inventory fills up, when night falls, when a mob wanders too close, when you are clearly building something and could use an extra pair of hands.",
+    "Under the hood it runs two loops. A fast loop handles the obvious Minecraft reflexes, like staying nearby, avoiding danger, and reacting to what changed. A slower agent loop reads the world state, remembers useful details, chooses goals, and talks through what it is doing in Discord.",
+    "The long-term version is not a menu of commands. It is a friend-shaped system for co-op worlds: useful enough to matter, quiet enough to not take over, and weirdly alive when it starts making small decisions beside you.",
+  ],
+  stats: [
+    { value: "24/7", label: "world presence" },
+    { value: "2 loops", label: "reflex + planning" },
+    { value: "voice", label: "discord native" },
+  ],
   columns: [
     {
       head: "what it does",

@@ -33,35 +33,36 @@ export const seo = {
   ],
 };
 
-export const jsonLd = [
-  {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: brand.mark,
-    url: absoluteUrl("/"),
-    description: seo.description,
-    inLanguage: "en-US",
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: brand.name,
-    applicationCategory: "GameApplication",
-    operatingSystem: "Minecraft Java Edition",
-    url: absoluteUrl("/"),
-    description: about.intro,
-    creator: {
-      "@type": "Organization",
-      name: "kalilabs",
-      email: brand.email,
+export const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      name: brand.mark,
+      url: absoluteUrl("/"),
+      description: seo.description,
+      inLanguage: "en-US",
     },
-    featureList: [
-      "follows the player in minecraft",
-      "acts through mineflayer and mcp tools",
-      "talks in a discord voice call",
-      "reads structured minecraft game state",
-      "remembers bases, chests, and world facts",
-      ...worksWith.map((item) => item.toLowerCase()),
-    ],
-  },
-];
+    {
+      "@type": "SoftwareApplication",
+      name: brand.name,
+      applicationCategory: "GameApplication",
+      operatingSystem: "Minecraft Java Edition",
+      url: absoluteUrl("/"),
+      description: about.intro,
+      creator: {
+        "@type": "Organization",
+        name: "kalilabs",
+        email: brand.email,
+      },
+      featureList: [
+        "follows the player in minecraft",
+        "acts through mineflayer and mcp tools",
+        "talks in a discord voice call",
+        "reads structured minecraft game state",
+        "remembers bases, chests, and world facts",
+        ...worksWith.map((item) => item.toLowerCase()),
+      ],
+    },
+  ],
+};
