@@ -36,12 +36,18 @@ export class VoiceHub {
       adapterCreator: guild.voiceAdapterCreator,
       selfDeaf: false, // must be able to hear people
       selfMute: false,
+      debug: true,
     });
     this.connection = connection;
 
     // Diagnostics: log every state transition so we can see where it gets stuck.
     connection.on("stateChange", (o, n) => log.info(`voice: ${o.status} -> ${n.status}`));
     connection.on("error", (e) => log.error("voice connection error:", (e as Error).message));
+    // Surface only meaningful internals (DAVE handshake, closes, errors); full
+    // stream available at LOG_LEVEL=debug.
+    connection.on("debug", (m: string) => {
+      if (/\[DAVE\]|clos|error|fail|4\d{3}/i.test(m)) log.debug("vdbg:", m.length > 200 ? m.slice(0, 200) : m);
+    });
 
     try {
       await entersState(connection, VoiceConnectionStatus.Ready, 30_000);

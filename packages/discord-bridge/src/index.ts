@@ -22,11 +22,18 @@ async function main() {
 
   const bridge = new Bridge(cfg);
 
+  // Don't let a voice-connection error take down the whole process.
+  client.on("error", (e) => log.error("discord client error:", e.message));
+
   client.once("ready", async () => {
     log.info(`logged in as ${client.user?.tag}`);
-    const guild = await client.guilds.fetch(cfg.discord.guildId);
-    await bridge.start(guild);
-    log.info("itto voice is up — join the call and talk to it");
+    try {
+      const guild = await client.guilds.fetch(cfg.discord.guildId);
+      await bridge.start(guild);
+      log.info("itto voice is up — join the call and talk to it");
+    } catch (e) {
+      log.error("voice startup failed:", (e as Error).message);
+    }
   });
 
   const shutdown = () => {

@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@discordjs/opus": "^0.9.0",
-    "@discordjs/voice": "^0.18.0",
+    "@discordjs/voice": "0.19.2",
     "@itto/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@snazzah/davey": "^0.1.11",
