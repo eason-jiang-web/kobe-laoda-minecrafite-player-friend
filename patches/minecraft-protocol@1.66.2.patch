@@ -1,0 +1,19 @@
+diff --git a/src/client/chat.js b/src/client/chat.js
+index 0021870994fc59a82f0ac8aba0a65a8be43ef2f4..16efefbacd7a092f518d18d8c57917fe5d0d2ea8 100644
+--- a/src/client/chat.js
++++ b/src/client/chat.js
+@@ -49,6 +49,14 @@ module.exports = function (client, options) {
+   function updateAndValidateSession (uuid, message, currentSignature, index, previousMessages, salt, timestamp) {
+     const player = client._players[uuid]
+ 
++    // itto patch: unsigned messages (servers with chat-rewriting plugins, e.g.
++    // Minehut, strip signatures) have no signature. Treat as unverified instead
++    // of passing undefined into crypto.verify, which throws and drops the bot.
++    if (!Buffer.isBuffer(currentSignature)) {
++      if (player) player.hasChainIntegrity = false
++      return false
++    }
++
+     if (player && player.hasChainIntegrity) {
+       if (!player.lastSignature || player.lastSignature.equals(currentSignature) || index > player.sessionIndex) {
+         player.lastSignature = currentSignature

@@ -29,5 +29,8 @@
     "@types/bun": "^1.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.4.0"
+  },
+  "patchedDependencies": {
+    "minecraft-protocol@1.66.2": "patches/minecraft-protocol@1.66.2.patch"
   }
 }
