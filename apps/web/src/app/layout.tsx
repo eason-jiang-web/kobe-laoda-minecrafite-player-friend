@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { FooterReveal } from "@/components/FooterReveal";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { PinnedFrame } from "@/components/PinnedFrame";
 
@@ -15,8 +16,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body id="top">
         <SmoothScroll>
+          <FooterReveal />
           <PinnedFrame />
-          {children}
+          <div className="relative z-10">{children}</div>
+          <div aria-hidden="true" className="hidden h-[720px] md:block" />
         </SmoothScroll>
       </body>
     </html>

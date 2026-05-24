@@ -4,32 +4,31 @@ import { banners } from "@/lib/content";
 import { Reveal } from "@/components/Reveal";
 
 /**
- * 04 — Banner. Full-bleed video with two stacked Manrope headers overlaid
- * (source: "FILM PRODUCTION & DIRECTION" / "creating solutions for business").
- * Uses the one clean captured video. itto copy: "FOLLOWS YOU & HELPS OUT".
+ * 04 — Banner. Full-bleed video with two Manrope headers pinned to the top
+ * corners, matching the live desktop banner geometry.
  */
 export function Banner() {
   return (
     <section className="relative h-[100svh] w-full overflow-hidden bg-ink">
       <video
-        className="absolute inset-0 h-full w-full object-cover opacity-90"
-        src="/video/banner.mp4"
+        className="absolute inset-0 h-full w-full object-cover"
+        src="/video/hero.mp4"
         autoPlay
         muted
         loop
         playsInline
       />
-      <div className="absolute inset-0 bg-black/30" />
-      <div className="relative flex h-full flex-col items-center justify-center gap-16 text-center text-white">
-        <Reveal>
-          <h2 className="font-sans text-h2 font-medium uppercase leading-tight">
+      <div className="absolute inset-0 bg-black/10" />
+      <div className="relative h-full text-white">
+        <Reveal className="absolute left-5 top-11">
+          <h2 className="font-sans text-[24px] font-medium uppercase leading-none">
             {banners.primary[0]}
             <br />
             {banners.primary[1]}
           </h2>
         </Reveal>
-        <Reveal delay={0.1}>
-          <h2 className="font-sans text-h2 font-medium uppercase leading-tight">
+        <Reveal delay={0.1} className="absolute right-5 top-11 text-right">
+          <h2 className="font-sans text-[24px] font-medium uppercase leading-none">
             {banners.secondary[0]}
             <br />
             {banners.secondary[1]}

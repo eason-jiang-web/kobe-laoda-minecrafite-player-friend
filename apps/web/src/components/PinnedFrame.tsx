@@ -1,59 +1,91 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { gsap } from "gsap";
+import { HoverLink } from "@/components/HoverLink";
 import { brand, nav } from "@/lib/content";
 
 /**
- * The pinned frame — the signature wideangles element. In the capture, a footer
- * block (brand / email / nav / rights) stays pinned across EVERY section boundary
- * (scrollY 0→7306, vpTopSlope 0 = pinned). Implemented as fixed corners overlaid
- * on the page, mix-blend so the labels invert against dark video and light canvas
- * sections alike.
+ * Fixed desktop header from the source: 50px tall, with brand/nav on the left
+ * and metadata columns across the top rail. The live page renders this white on
+ * canvas sections, so it mostly disappears there and stays visible on footage.
  */
 export function PinnedFrame() {
+  const root = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      gsap.set(el, { y: 0 });
+      return;
+    }
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        el,
+        { y: -50 },
+        { y: 0, duration: 0.9, ease: "expo.out", overwrite: true },
+      );
+    }, root);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 mix-blend-difference">
-      <div className="relative h-full w-full px-[10px] py-[14px] text-white md:px-5 md:py-5">
-        {/* top-left: brand mark */}
-        <a
+    <header
+      ref={root}
+      className="pointer-events-none fixed left-0 top-0 z-50 hidden h-[50px] w-full md:block"
+      style={{
+        transform: "translateY(-50px)",
+        willChange: "transform",
+      }}
+    >
+      <div className="relative h-full w-full text-white">
+        <HoverLink
           href="#top"
-          className="u-label pointer-events-auto absolute left-[10px] top-[14px] md:left-5 md:top-5"
+          className="u-label pointer-events-auto absolute left-5 top-5"
         >
           {brand.mark}
-          <br />
-          {brand.tagline}
-        </a>
+        </HoverLink>
 
-        {/* top-right: location / year */}
-        <div className="u-label absolute right-[10px] top-[14px] text-right md:right-5 md:top-5">
-          {brand.location}
-          <br />
-          est. {brand.year}
-        </div>
-
-        {/* bottom-left: rights */}
-        <div className="u-label absolute bottom-[14px] left-[10px] md:bottom-5 md:left-5">
-          all rights reserved
-          <br />
-          {brand.name}
-        </div>
-
-        {/* bottom-right: nav + email */}
-        <div className="absolute bottom-[14px] right-[10px] flex flex-col items-end gap-[2px] md:bottom-5 md:right-5">
-          <nav className="pointer-events-auto flex flex-col items-end gap-[2px]">
-            {nav.map((item) => (
-              <a key={item.href} href={item.href} className="u-label hover:opacity-60">
+        <nav className="u-label pointer-events-auto absolute left-5 top-[35px] flex items-center gap-[5px]">
+          {nav.map((item, index) => (
+            <span key={item.href} className="flex items-center gap-[5px]">
+              <HoverLink href={item.href}>
                 {item.label}
-              </a>
-            ))}
-          </nav>
-          <a
+              </HoverLink>
+              {index < nav.length - 1 ? <span>/</span> : null}
+            </span>
+          ))}
+        </nav>
+
+        <div className="u-label absolute left-[25.55%] top-5">
+          ai minecraft duo
+          <br />
+          based in {brand.location}
+        </div>
+
+        <div className="u-label absolute left-[50.35%] top-5">
+          <HoverLink
             href={`mailto:${brand.email}`}
-            className="u-label pointer-events-auto mt-2 hover:opacity-60"
+            className="pointer-events-auto"
           >
             {brand.email}
-          </a>
+          </HoverLink>
+          <br />
+          <HoverLink href="#cta" className="pointer-events-auto">
+            early access
+          </HoverLink>
+        </div>
+
+        <div className="u-label absolute left-[74.5%] top-5">
+          est. {brand.year}
+          <br />
+          kalilabs
         </div>
       </div>
-    </div>
+    </header>
   );
 }

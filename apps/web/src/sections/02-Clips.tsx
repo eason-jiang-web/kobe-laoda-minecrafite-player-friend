@@ -1,39 +1,50 @@
 "use client";
 
 import { clips } from "@/lib/content";
+import { ClipHoverCard } from "@/components/ClipHoverCard";
 import { Reveal } from "@/components/Reveal";
 
 /**
- * 02 — Clips (source: "Latest"). Big thin display header + count, then an
- * editorial grid of gameplay thumbnails with 11px mono captions (title / mode /
- * date). Source uses videos; we render captioned tiles (assets are stand-ins —
- * 6/12 source videos failed magic-byte validation on capture).
+ * 02 — Clips (source: "Latest"). Desktop source geometry is an editorial
+ * masonry: 160px header, two 720x436 feature tiles, then three 480x291 tiles.
  */
 export function Clips() {
+  const featureClips = clips.slice(0, 2);
+  const smallClips = clips.slice(2, 5);
+
   return (
-    <section id="clips" className="bg-canvas px-[10px] py-24 md:px-5 md:py-32">
-      <div className="mb-12 flex items-end justify-between">
-        <h2 className="font-display text-display font-light leading-[0.85] tracking-tightest text-ink">
+    <section id="clips" className="overflow-hidden bg-canvas pb-px pt-24">
+      <Reveal y={60} className="mb-[62px] flex h-32 items-start justify-between px-[10px] md:px-5">
+        <h2 className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-normal text-ink">
           clips
         </h2>
-        <span className="font-display text-display font-light leading-[0.85] text-ink">
+        <span className="font-display text-[160px] font-light leading-[0.8] tracking-normal text-ink">
           {clips.length}
         </span>
+      </Reveal>
+
+      <div className="grid grid-cols-1 md:grid-cols-2">
+        {featureClips.map((clip, i) => (
+          <Reveal key={clip.title} delay={i * 0.08}>
+            <ClipHoverCard
+              title={clip.title}
+              who={clip.who}
+              date={clip.date}
+              mediaClassName="h-[436px] w-full"
+            />
+          </Reveal>
+        ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-[10px] md:grid-cols-3 lg:grid-cols-3">
-        {clips.map((clip, i) => (
-          <Reveal key={clip.title} delay={(i % 3) * 0.06} className="group">
-            <div className="relative aspect-[4/3] w-full overflow-hidden bg-ink">
-              <div className="absolute inset-0 grid place-items-center opacity-30 transition-opacity duration-500 group-hover:opacity-50">
-                <span className="font-display text-7xl text-white/60">{i + 1}</span>
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline justify-between gap-2">
-              <span className="u-label text-ink">{clip.title}</span>
-              <span className="u-label text-muted">{clip.who}</span>
-              <span className="u-label text-ink">{clip.date}</span>
-            </div>
+      <div className="mt-[52px] grid grid-cols-1 md:grid-cols-3">
+        {smallClips.map((clip, i) => (
+          <Reveal key={clip.title} delay={i * 0.06}>
+            <ClipHoverCard
+              title={clip.title}
+              who={clip.who}
+              date={clip.date}
+              mediaClassName="h-[291px] w-full"
+            />
           </Reveal>
         ))}
       </div>
