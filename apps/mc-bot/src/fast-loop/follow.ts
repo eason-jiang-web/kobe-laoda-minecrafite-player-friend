@@ -62,15 +62,34 @@ export class FollowController {
 
     const me = this.bot.entity.position;
     const dist = me.distanceTo(player.position);
-    const range = this.cfg.tuning.followTargetRange;
+    const range = this.cfg.tuning.followTargetRange; // desired standoff (~3)
+    const stopDist = range + 1; // stop closing in around here, so we settle ~3-4 away
+    const tooClose = 2; // any closer and we're in his face / blocking his view
 
-    if (dist <= 5) {
+    // In his face — back off to ~range so we're not blocking his vision.
+    if (dist < tooClose) {
       this.state = "IDLE";
-      // gentle presence: face the player, no pathing
+      const away = me.minus(player.position);
+      const dir = away.norm() > 0.01 ? away.normalize() : new Vec3(1, 0, 0);
+      const spot = player.position.plus(dir.scaled(range));
+      this.bot.pathfinder.setGoal(new goals.GoalNear(spot.x, spot.y, spot.z, 1), false);
+      this.lastGoalPos = null;
+      return;
+    }
+
+    // Comfortable distance — STOP pathing (this is the bug fix: previously the
+    // dynamic goal kept running and glued us onto him) and just be present.
+    if (dist <= stopDist) {
+      this.state = "IDLE";
+      if (this.lastGoalPos) {
+        this.bot.pathfinder.setGoal(null);
+        this.lastGoalPos = null;
+      }
       this.bot.lookAt(player.position.offset(0, 1.6, 0), false);
       return;
     }
 
+    // Too far — catch up to ~range blocks away.
     this.state = dist > 10 ? "CATCHUP" : "DRIFT";
 
     // Predictive target: where the player is heading.
