@@ -1,3 +1,4 @@
+import "./opus-patch.js"; // MUST be first: forces opusscript over the crashing native opus
 import { Client, GatewayIntentBits } from "discord.js";
 import { loadVoiceConfig } from "./config.js";
 import { Bridge } from "./bridge.js";
