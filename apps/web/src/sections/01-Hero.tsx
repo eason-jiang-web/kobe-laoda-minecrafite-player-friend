@@ -1,13 +1,14 @@
 "use client";
 
+import { brand, clips } from "@/lib/content";
+
 /**
  * 01 — Hero. Full-bleed cinematic loop: an AI agent HUD scanning a Minecraft
- * world (taiga, lake, cozy cabin at golden hour). The footage already carries the
- * visual story — agent swarm status, planned route, action queue — so the scrim
- * stays light and we don't overlay extra labels that would fight the HUD. The
- * PinnedFrame (brand/nav/email corners) sits on top from the layout.
+ * world, with the source hero's four midline metadata labels and bottom cue.
  */
 export function Hero() {
+  const featured = clips[0];
+
   return (
     <section id="hero" className="relative h-[100svh] w-full overflow-hidden bg-ink">
       <video
@@ -22,8 +23,21 @@ export function Hero() {
           without burying the HUD */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/30" />
 
+      <span className="u-label absolute left-[10px] top-1/2 -translate-y-1/2 text-white md:left-5">
+        {featured.title}
+      </span>
+      <span className="u-label absolute left-1/3 top-1/2 -translate-y-1/2 text-white">
+        {featured.who}
+      </span>
+      <span className="u-label absolute left-2/3 top-1/2 -translate-y-1/2 text-white">
+        {brand.location}
+      </span>
+      <span className="u-label absolute right-[10px] top-1/2 -translate-y-1/2 text-right text-white md:right-5">
+        {brand.year}
+      </span>
+
       {/* scroll cue */}
-      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 text-white">
+      <div className="absolute bottom-[17px] left-1/2 -translate-x-1/2 text-white">
         <span className="u-label">scroll down</span>
       </div>
     </section>
