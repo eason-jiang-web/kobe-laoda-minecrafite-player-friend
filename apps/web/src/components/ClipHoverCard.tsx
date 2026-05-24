@@ -17,7 +17,7 @@ export function ClipHoverCard({
   mediaClassName,
 }: ClipHoverCardProps) {
   const root = useRef<HTMLDivElement>(null);
-  const media = useRef<HTMLVideoElement>(null);
+  const media = useRef<HTMLDivElement>(null);
   const caption = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,21 +36,21 @@ export function ClipHoverCard({
         gsap.to(video, {
           scale: 1.03,
           filter: "grayscale(1)",
-          duration: 0.32,
+          duration: 0.75,
           ease: "power3.out",
           overwrite: true,
         });
         gsap.fromTo(
           text,
           { y: 10 },
-          { y: 0, duration: 0.32, ease: "expo.out", overwrite: true },
+          { y: 0, duration: 0.75, ease: "power3.out", overwrite: true },
         );
       };
       const leave = () => {
         gsap.to(video, {
           scale: 1,
           filter: "grayscale(0)",
-          duration: 0.32,
+          duration: 0.75,
           ease: "power3.out",
           overwrite: true,
         });
@@ -71,15 +71,19 @@ export function ClipHoverCard({
   return (
     <div ref={root} className="group">
       <div className={`${mediaClassName} relative overflow-hidden bg-ink`}>
-        <video
+        <div
           ref={media}
-          className="absolute inset-0 h-full w-full object-cover"
-          src="/video/hero.mp4"
-          autoPlay
-          muted
-          loop
-          playsInline
-        />
+          className="absolute inset-0 h-full w-full"
+        >
+          <video
+            className="h-full w-full object-cover"
+            src="/video/hero.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+          />
+        </div>
       </div>
       <div ref={caption} className="grid h-[41px] grid-cols-2 px-5 pt-3">
         <div>

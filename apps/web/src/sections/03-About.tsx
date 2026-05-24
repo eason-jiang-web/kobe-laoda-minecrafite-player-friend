@@ -1,6 +1,7 @@
 "use client";
 
 import { about } from "@/lib/content";
+import { HeaderReveal } from "@/components/HeaderReveal";
 import { Reveal } from "@/components/Reveal";
 import { Arrow } from "@/components/Arrow";
 import { brand } from "@/lib/content";
@@ -42,15 +43,14 @@ export function About() {
       </div>
 
       {/* redirect band — y=60 big-block slide like the source */}
-      <Reveal
-        y={60}
-        className="mt-[49px] flex h-40 items-center justify-between text-ink no-underline"
-      >
-        <h2 className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-normal text-ink">
+      <div className="mt-[49px] flex h-40 items-center justify-between text-ink no-underline">
+        <HeaderReveal className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-normal text-ink">
           about
-        </h2>
-        <Arrow className="h-40 w-40 shrink-0 text-ink" />
-      </Reveal>
+        </HeaderReveal>
+        <Reveal y={60} className="shrink-0">
+          <Arrow className="h-40 w-40 text-ink" />
+        </Reveal>
+      </div>
     </section>
   );
 }

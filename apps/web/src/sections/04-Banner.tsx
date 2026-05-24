@@ -1,7 +1,7 @@
 "use client";
 
 import { banners } from "@/lib/content";
-import { Reveal } from "@/components/Reveal";
+import { HeaderReveal } from "@/components/HeaderReveal";
 
 /**
  * 04 — Banner. Full-bleed video with two Manrope headers pinned to the top
@@ -20,20 +20,23 @@ export function Banner() {
       />
       <div className="absolute inset-0 bg-black/10" />
       <div className="relative h-full text-white">
-        <Reveal className="absolute left-5 top-11">
-          <h2 className="font-sans text-[24px] font-medium uppercase leading-none">
+        <div className="absolute left-5 top-11">
+          <HeaderReveal className="font-sans text-[24px] font-medium uppercase leading-none">
             {banners.primary[0]}
             <br />
             {banners.primary[1]}
-          </h2>
-        </Reveal>
-        <Reveal delay={0.1} className="absolute right-5 top-11 text-right">
-          <h2 className="font-sans text-[24px] font-medium uppercase leading-none">
+          </HeaderReveal>
+        </div>
+        <div className="absolute right-5 top-11 text-right">
+          <HeaderReveal
+            delay={0.1}
+            className="font-sans text-[24px] font-medium uppercase leading-none"
+          >
             {banners.secondary[0]}
             <br />
             {banners.secondary[1]}
-          </h2>
-        </Reveal>
+          </HeaderReveal>
+        </div>
       </div>
     </section>
   );

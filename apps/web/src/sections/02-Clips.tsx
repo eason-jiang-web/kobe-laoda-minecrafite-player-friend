@@ -2,6 +2,7 @@
 
 import { clips } from "@/lib/content";
 import { ClipHoverCard } from "@/components/ClipHoverCard";
+import { HeaderReveal } from "@/components/HeaderReveal";
 import { Reveal } from "@/components/Reveal";
 
 /**
@@ -14,14 +15,18 @@ export function Clips() {
 
   return (
     <section id="clips" className="overflow-hidden bg-canvas pb-px pt-24">
-      <Reveal y={60} className="mb-[62px] flex h-32 items-start justify-between px-[10px] md:px-5">
-        <h2 className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-normal text-ink">
+      <div className="mb-[62px] flex h-32 items-start justify-between px-[10px] md:px-5">
+        <HeaderReveal className="font-display text-[160px] font-light uppercase leading-[0.8] tracking-normal text-ink">
           clips
-        </h2>
-        <span className="font-display text-[160px] font-light leading-[0.8] tracking-normal text-ink">
+        </HeaderReveal>
+        <HeaderReveal
+          as="span"
+          delay={0.08}
+          className="inline-block font-display text-[160px] font-light leading-[0.8] tracking-normal text-ink"
+        >
           {clips.length}
-        </span>
-      </Reveal>
+        </HeaderReveal>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2">
         {featureClips.map((clip, i) => (

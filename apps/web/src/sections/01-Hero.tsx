@@ -1,6 +1,7 @@
 "use client";
 
 import { Reveal } from "@/components/Reveal";
+import { HoverLink } from "@/components/HoverLink";
 import { brand, clips } from "@/lib/content";
 
 /**
@@ -47,8 +48,10 @@ export function Hero() {
 
       {/* scroll cue */}
       <div className="absolute bottom-[17px] left-1/2 -translate-x-1/2 text-white">
-        <Reveal as="span" delay={0.24} className="u-label inline-block">
-          scroll down
+        <Reveal delay={0.24} className="u-label inline-block">
+          <HoverLink href="#clips" className="pointer-events-auto">
+            scroll down
+          </HoverLink>
         </Reveal>
       </div>
     </section>

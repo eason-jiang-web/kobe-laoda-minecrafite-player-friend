@@ -2,13 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { HeaderReveal } from "@/components/HeaderReveal";
 import { points } from "@/lib/content";
 import { Reveal } from "@/components/Reveal";
-
-if (typeof window !== "undefined") {
-  gsap.registerPlugin(ScrollTrigger);
-}
 
 /**
  * 05 — Points. Desktop source geometry: 643px tall, centered headline at the
@@ -20,29 +16,27 @@ export function Points() {
   const belt = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const section = root.current;
     const track = belt.current;
-    if (!section || !track) return;
+    if (!track) return;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      gsap.set(track, { x: -424 });
+      gsap.set(track, { x: -418 });
       return;
     }
 
     const ctx = gsap.context(() => {
-      gsap.set(track, { x: -424, willChange: "transform" });
+      const wrapX = gsap.utils.wrap(-818, -418);
 
-      gsap
-        .timeline({
-          scrollTrigger: {
-            trigger: section,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: true,
-          },
-        })
-        .fromTo(track, { x: -370 }, { x: -424, duration: 0.58, ease: "none" })
-        .to(track, { x: -505, duration: 0.42, ease: "none" });
+      gsap.set(track, { x: -418, willChange: "transform" });
+      gsap.to(track, {
+        x: "-=400",
+        duration: 3.9,
+        ease: "none",
+        repeat: -1,
+        modifiers: {
+          x: (value) => `${wrapX(parseFloat(value))}px`,
+        },
+      });
     }, root);
 
     return () => ctx.revert();
@@ -54,11 +48,11 @@ export function Points() {
       id="points"
       className="relative h-auto overflow-hidden bg-canvas px-[10px] pb-[242px] pt-24 md:h-[643px] md:px-5 md:pb-0"
     >
-      <Reveal y={40} className="mx-auto max-w-[550px] text-center">
-        <h2 className="font-sans text-[24px] font-medium uppercase leading-none text-ink">
+      <div className="mx-auto max-w-[550px] text-center">
+        <HeaderReveal className="font-sans text-[24px] font-medium uppercase leading-none text-ink">
           {points.manifesto}
-        </h2>
-      </Reveal>
+        </HeaderReveal>
+      </div>
 
       <div className="mt-20 grid grid-cols-1 gap-10 md:absolute md:left-5 md:right-5 md:top-[244px] md:mt-0 md:flex md:justify-between">
         <Reveal className="max-w-[420px]">
@@ -76,7 +70,7 @@ export function Points() {
           ref={belt}
           data-points-belt=""
           className="flex h-full"
-          style={{ transform: "translateX(-424px)" }}
+          style={{ transform: "translateX(-418px)" }}
         >
           {Array.from({ length: 6 }).map((_, i) => (
             <video

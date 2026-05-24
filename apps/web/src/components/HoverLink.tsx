@@ -11,11 +11,11 @@ type HoverLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 export function HoverLink({ children, className = "", ...props }: HoverLinkProps) {
   const root = useRef<HTMLAnchorElement>(null);
   const line = useRef<HTMLSpanElement>(null);
+  const active = useRef<gsap.core.Animation | null>(null);
 
   useEffect(() => {
-    const el = root.current;
     const underline = line.current;
-    if (!el || !underline) return;
+    if (!underline) return;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       gsap.set(underline, { scaleX: 1 });
@@ -28,38 +28,49 @@ export function HoverLink({ children, className = "", ...props }: HoverLinkProps
         transformOrigin: "right center",
         willChange: "transform",
       });
-
-      const enter = () => {
-        gsap.fromTo(
-          underline,
-          { scaleX: 0, transformOrigin: "left center" },
-          { scaleX: 1, duration: 0.55, ease: "power3.out", overwrite: true },
-        );
-      };
-      const leave = () => {
-        gsap.to(underline, {
-          scaleX: 0,
-          duration: 0.34,
-          ease: "power3.out",
-          transformOrigin: "right center",
-          overwrite: true,
-        });
-      };
-
-      el.addEventListener("pointerenter", enter);
-      el.addEventListener("pointerleave", leave);
-
-      return () => {
-        el.removeEventListener("pointerenter", enter);
-        el.removeEventListener("pointerleave", leave);
-      };
     }, root);
 
     return () => ctx.revert();
   }, []);
 
+  const showUnderline = () => {
+    const underline = line.current;
+    if (!underline) return;
+
+    active.current?.kill();
+    gsap.set(underline, { transformOrigin: "left center" });
+    active.current = gsap.to(underline, {
+      scaleX: 1,
+      duration: 0.42,
+      ease: "power2.inOut",
+      overwrite: true,
+    });
+  };
+
+  const hideUnderline = () => {
+    const underline = line.current;
+    if (!underline) return;
+
+    active.current?.kill();
+    gsap.set(underline, { transformOrigin: "right center" });
+    active.current = gsap.to(underline, {
+      scaleX: 0,
+      duration: 0.42,
+      ease: "power2.inOut",
+      overwrite: true,
+    });
+  };
+
   return (
-    <a {...props} ref={root} className={`relative inline-block min-w-max ${className}`}>
+    <a
+      {...props}
+      ref={root}
+      className={`relative inline-block min-w-max ${className}`}
+      onPointerEnter={showUnderline}
+      onPointerLeave={hideUnderline}
+      onFocus={showUnderline}
+      onBlur={hideUnderline}
+    >
       <span>{children}</span>
       <span
         ref={line}
