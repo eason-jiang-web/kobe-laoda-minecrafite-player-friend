@@ -25,6 +25,7 @@ export class Bridge {
   private prev: GameState | null = null;
   private lastChatAt = 0;
   private lastSeenGoalId: string | null = null;
+  private lastBrainAt = 0;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly cfg: VoiceConfig) {
@@ -44,6 +45,7 @@ export class Bridge {
       onAudio: (pcmMono, rate) => this.voice?.play(elevenToDiscord(pcmMono, rate)),
       onInterruption: () => this.voice?.flush(),
       onToolCall: (name, id, params) => void this.handleToolCall(name, id, params),
+      onUserTranscript: (text) => this.forwardToBrain(text),
       onReady: () => log.info("itto is live in the call"),
       onClose: () => log.warn("ElevenLabs conversation closed"),
     });
@@ -98,6 +100,40 @@ export class Bridge {
       }
     } catch (e) {
       this.eleven?.sendToolResult(id, `error: ${(e as Error).message}`, true);
+    }
+  }
+
+  // ── voice transcripts → the brain (jabby) ──
+
+  /**
+   * Hybrid brain split: ElevenLabs handles the live voice (talk + quick
+   * reactions), and we forward what people SAY to jabby so it has full context
+   * + memory and owns in-world actions (set_goal / skills). Fire-and-forget with
+   * a cooldown (each spawn is a full brain turn). No-op if BRAIN_CMD is unset.
+   */
+  private forwardToBrain(transcript: string): void {
+    const { cmd, dir, cooldownMs } = this.cfg.brain;
+    if (cmd.length === 0) return; // forwarding disabled
+    const now = Date.now();
+    if (now - this.lastBrainAt < cooldownMs) return;
+    this.lastBrainAt = now;
+
+    const prompt = [
+      "You're itto, in a live Minecraft voice call with your friends. The voice layer is handling talking out loud — your job is the HANDS + memory in the Minecraft world.",
+      `Someone in the call just said: "${transcript}"`,
+      "If they want something done in the world (come, follow, get wood, mine, fight, fetch, scout, build), DO it via the itto-mc tools — prefer set_goal for multi-step tasks. Read itto://state/current and itto://memory/world first for live context. Remember anything useful (locations, what they like). If it's just chit-chat, do nothing — the voice layer's got that.",
+    ].join("\n");
+
+    try {
+      const proc = Bun.spawn([...cmd, prompt], { cwd: dir, stdout: "ignore", stderr: "pipe" });
+      void proc.exited.then(async (code) => {
+        if (code !== 0) {
+          const err = (await new Response(proc.stderr).text()).slice(0, 200);
+          log.warn(`brain exited ${code}: ${err}`);
+        }
+      });
+    } catch (e) {
+      log.error("failed to forward to brain:", (e as Error).message);
     }
   }
 

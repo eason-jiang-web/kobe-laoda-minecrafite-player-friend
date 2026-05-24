@@ -23,6 +23,16 @@ export interface VoiceConfig {
   mcpUrl: string;
   /** how often to poll MC state for context pushes (ms). */
   contextPollMs: number;
+  /**
+   * The brain (jabby). Voice transcripts are forwarded here so jabby has full
+   * context + memory and owns in-world actions. Same BRAIN_* env as the mc-bot.
+   * Empty cmd = forwarding off (ElevenLabs handles voice solo).
+   */
+  brain: {
+    cmd: string[];
+    dir?: string;
+    cooldownMs: number;
+  };
   logLevel: string;
 }
 
@@ -41,6 +51,11 @@ export function loadVoiceConfig(): VoiceConfig {
     },
     mcpUrl: process.env.ITTO_MCP_URL ?? "http://localhost:3001/mcp",
     contextPollMs: Number(process.env.VOICE_CONTEXT_POLL_MS ?? 5000),
+    brain: {
+      cmd: (process.env.BRAIN_CMD ?? "").split(" ").filter(Boolean),
+      dir: process.env.BRAIN_DIR || undefined,
+      cooldownMs: Number(process.env.BRAIN_COOLDOWN_MS ?? 10000),
+    },
     logLevel: process.env.LOG_LEVEL ?? "info",
   };
 }

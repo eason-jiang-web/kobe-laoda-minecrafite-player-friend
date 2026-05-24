@@ -4,7 +4,7 @@ import type { BotController } from "../bot/controller.js";
 import type { Config } from "../config.js";
 import type { WorldMemory } from "../memory/store.js";
 import type { GoalRunner } from "./goal-runner.js";
-import { TRIGGERS, MEMORY_TRIGGERS, VibeCheck } from "./triggers.js";
+import { TRIGGERS, MEMORY_TRIGGERS, VibeCheck, HeartbeatCheck } from "./triggers.js";
 import { logger } from "../util/logger.js";
 
 const log = logger("slow-loop");
@@ -36,6 +36,7 @@ export class SlowLoop {
   private timer: ReturnType<typeof setInterval> | null = null;
   private prev: GameState | null = null;
   private readonly vibe = new VibeCheck();
+  private readonly heartbeat: HeartbeatCheck;
   private lastNudgeAt = 0;
   /** A goal that just finished, waiting to be surfaced to the brain once. */
   private lastCompleted: BotGoal | null = null;
@@ -46,7 +47,9 @@ export class SlowLoop {
     private readonly sink: NudgeSink,
     private readonly runner: GoalRunner,
     private readonly memory: WorldMemory,
-  ) {}
+  ) {
+    this.heartbeat = new HeartbeatCheck(cfg.tuning.heartbeatMs);
+  }
 
   start(): void {
     this.timer = setInterval(() => this.tick(), this.cfg.tuning.slowLoopIntervalMs);
@@ -94,6 +97,8 @@ export class SlowLoop {
       }
     }
     if (!reason && this.vibe.due()) reason = "vibe check: comment on surroundings if interesting";
+    if (!reason && this.heartbeat.due())
+      reason = "heartbeat: reassess the scene — do or say something if it's genuinely worth it, otherwise stay quiet";
 
     this.prev = state;
     if (!reason) return;

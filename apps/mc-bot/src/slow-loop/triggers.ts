@@ -127,3 +127,19 @@ export class VibeCheck {
     return true;
   }
 }
+
+/**
+ * Heartbeat — wake the brain on a fixed cadence even when nothing happened, so
+ * it stays proactive and fully reactive in any circumstance. `intervalMs <= 0`
+ * disables it. Costs a brain turn each beat, so keep it modest (default ~30s).
+ */
+export class HeartbeatCheck {
+  private lastAt = Date.now();
+  constructor(private readonly intervalMs: number) {}
+  due(): boolean {
+    if (this.intervalMs <= 0) return false;
+    if (Date.now() - this.lastAt < this.intervalMs) return false;
+    this.lastAt = Date.now();
+    return true;
+  }
+}

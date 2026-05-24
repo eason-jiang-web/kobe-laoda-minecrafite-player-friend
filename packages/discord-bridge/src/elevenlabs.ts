@@ -10,6 +10,8 @@ export interface ElevenHandlers {
   onToolCall(name: string, id: string, params: Record<string, unknown>): void;
   /** Agent got interrupted (stop playback, flush). */
   onInterruption(): void;
+  /** A user's speech was transcribed (forward to the brain for context + memory). */
+  onUserTranscript?(text: string): void;
   onReady?(): void;
   onClose?(): void;
 }
@@ -129,9 +131,12 @@ export class ElevenConversation {
       case "ping":
         this.send({ type: "pong", event_id: msg.ping_event?.event_id });
         break;
-      case "user_transcript":
-        log.info("🗣️  user:", msg.user_transcription_event?.user_transcript);
+      case "user_transcript": {
+        const t = msg.user_transcription_event?.user_transcript;
+        log.info("🗣️  user:", t);
+        if (t) this.handlers.onUserTranscript?.(String(t));
         break;
+      }
       case "agent_response":
         log.info("🤖 itto:", msg.agent_response_event?.agent_response);
         break;

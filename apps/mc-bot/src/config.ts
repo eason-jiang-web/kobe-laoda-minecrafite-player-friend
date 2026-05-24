@@ -32,6 +32,8 @@ export interface Config {
     slowLoopIntervalMs: number;
     followTargetRange: number;
     teleportFallbackDistance: number;
+    /** How often to wake the brain to reassess even with no event (0 = off). */
+    heartbeatMs: number;
   };
   brain: {
     /** When true, route slow-loop nudges to an external agent instead of logging. */
@@ -70,6 +72,7 @@ export function loadConfig(): Config {
       slowLoopIntervalMs: num("SLOW_LOOP_INTERVAL_MS", 4000),
       followTargetRange: num("FOLLOW_TARGET_RANGE", 3),
       teleportFallbackDistance: num("TELEPORT_FALLBACK_DISTANCE", 30),
+      heartbeatMs: num("HEARTBEAT_MS", 30000),
     },
     brain: {
       enabled: process.env.BRAIN_ENABLED === "true",
