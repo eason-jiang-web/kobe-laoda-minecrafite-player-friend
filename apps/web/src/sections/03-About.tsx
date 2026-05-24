@@ -12,7 +12,7 @@ import { brand } from "@/lib/content";
  */
 export function About() {
   return (
-    <section id="about" className="relative overflow-hidden bg-canvas px-[10px] py-24 md:px-5">
+    <section id="about" className="relative overflow-hidden bg-canvas px-[10px] py-24 md:px-5 md:pb-[97px]">
       <div className="grid grid-cols-2 gap-y-10 md:grid-cols-4 md:gap-x-0">
         {/* intro block */}
         <Reveal className="col-span-2 max-w-[285px] md:col-span-1">
