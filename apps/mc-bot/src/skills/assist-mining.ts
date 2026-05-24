@@ -1,23 +1,37 @@
-import type { Skill } from "./types.js";
+import type { Skill, SkillContext } from "./types.js";
 import { runWithTask } from "./types.js";
+import { connectedComponent } from "./_geometry.js";
 
 /**
- * assist_mining() — when the player is mining, mine adjacent blocks to widen
- * the tunnel / strip the vein so two sets of hands go faster.
- *
- * TODO: real impl reads the player's look vector + the ore vein around them
- * (bot.findBlocks for matching ore) and mines the blocks they're NOT hitting.
+ * Shared body for assist_mining / mine_vein. Picks a target ore (explicit arg,
+ * else what the player is looking at, else any ore), finds the connected vein,
+ * mines it out, and collects the drops.
  */
+async function mineVeinBody(ctx: SkillContext, args?: Record<string, unknown>): Promise<string> {
+  return runWithTask(ctx, async () => {
+    let ore = typeof args?.ore === "string" ? args.ore : null;
+    if (!ore) {
+      const look = await ctx.control.lookingAt();
+      ore = look && look.name.endsWith("_ore") ? look.name : "any_ore";
+    }
+    const seeds = await ctx.control.findBlocks({ name: ore, maxDistance: 16, count: 32 });
+    if (seeds.length === 0) return `no ${ore} to mine nearby`;
+    const vein = connectedComponent(seeds, seeds[0]!, 32);
+    const mined = await ctx.control.mineMany(vein);
+    await ctx.control.sweepColumns(vein);
+    await ctx.control.collectNearbyDrops({ radius: 6 });
+    return mined > 0 ? `cleared a vein of ${mined} ${ore}` : `couldn't reach the ${ore}`;
+  });
+}
+
 export const assistMining: Skill = {
   name: "assist_mining",
-  description: "Mine alongside the player — widen tunnels and clear nearby ore.",
-  async run(ctx, args) {
-    return runWithTask(ctx, async () => {
-      const state = ctx.control.getState();
-      if (!state.player?.pos) return "lost the player, can't assist";
-      // placeholder: move next to player, the vein-detection loop goes here.
-      await ctx.control.moveTo(state.player.pos, { range: 2 });
-      return "mining alongside (stub — vein detection TODO)";
-    });
-  },
+  description: "Mine alongside the player — find and clear a nearby ore vein (or whatever they're looking at).",
+  run: mineVeinBody,
+};
+
+export const mineVein: Skill = {
+  name: "mine_vein",
+  description: "Mine out a connected ore vein. Pass { ore: 'iron_ore' } or it uses what the player is looking at.",
+  run: mineVeinBody,
 };

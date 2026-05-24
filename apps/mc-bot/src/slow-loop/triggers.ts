@@ -1,4 +1,5 @@
 import type { GameState } from "@itto/shared";
+import type { WorldMemory } from "../memory/store.js";
 
 /**
  * A trigger is a cheap predicate over game state that decides "is anything
@@ -10,6 +11,12 @@ export interface Trigger {
   name: string;
   /** Return a short reason string if it should fire, else null. */
   check(state: GameState, prev: GameState | null): string | null;
+}
+
+/** A trigger that also needs world memory (kept separate so pure triggers stay pure). */
+export interface MemoryTrigger {
+  name: string;
+  check(state: GameState, prev: GameState | null, memory: WorldMemory): string | null;
 }
 
 const POINT_PHRASES = ["look at this", "what do you think", "check this out", "see this", "look"];
@@ -50,6 +57,58 @@ export const TRIGGERS: Trigger[] = [
     name: "self_low_health",
     check: (s, prev) => {
       if (s.self.health <= 6 && (prev?.self.health ?? 20) > 6) return "bot health critical";
+      return null;
+    },
+  },
+  {
+    name: "inventory_full",
+    check: (s, prev) => {
+      // heuristic: ~36 inventory slots; fire once when we cross near-full.
+      const full = s.inventory.length >= 35;
+      const wasFull = (prev?.inventory.length ?? 0) >= 35;
+      return full && !wasFull ? "inventory's basically full" : null;
+    },
+  },
+  {
+    name: "tool_broke",
+    check: (s, prev) => {
+      const d = s.self.heldDurability;
+      if (!d) return null;
+      const ratio = d.current / d.max;
+      const pd = prev?.self.heldDurability;
+      const pratio = pd ? pd.current / pd.max : 1;
+      if (ratio < 0.1 && pratio >= 0.1) return `${s.self.heldItem} is about to break`;
+      return null;
+    },
+  },
+  {
+    name: "night_falling",
+    check: (s, prev) => {
+      if (prev == null) return null;
+      if (prev.timeOfDay < 12000 && s.timeOfDay >= 12000) return "getting dark out";
+      return null;
+    },
+  },
+];
+
+/** How long to wait before re-announcing a new area (avoids spamming while exploring). */
+let lastNewAreaFire = 0;
+
+export const MEMORY_TRIGGERS: MemoryTrigger[] = [
+  {
+    name: "reached_new_area",
+    check: (s, _prev, memory) => {
+      if (Date.now() - lastNewAreaFire < 300_000) return null;
+      const wps = memory.recallLocations({ limit: 100 });
+      if (wps.length === 0) return null;
+      const here = s.self.pos;
+      const nearest = Math.min(
+        ...wps.map((w) => Math.hypot(here.x - w.pos.x, here.y - w.pos.y, here.z - w.pos.z)),
+      );
+      if (nearest > 200) {
+        lastNewAreaFire = Date.now();
+        return "we're somewhere new, far from anywhere itto knows";
+      }
       return null;
     },
   },

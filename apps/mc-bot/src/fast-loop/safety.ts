@@ -14,7 +14,12 @@ const log = logger("safety");
 export class SafetyReflexes {
   private lastEatAt = 0;
 
-  constructor(private readonly bot: Bot) {}
+  constructor(private bot: Bot) {}
+
+  /** Re-point at a fresh connection after a reconnect. */
+  rebind(bot: Bot): void {
+    this.bot = bot;
+  }
 
   tick(): boolean {
     if (this.avoidLava()) return true;

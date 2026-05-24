@@ -22,7 +22,20 @@ export function createBot(cfg: Config): Promise<Bot> {
   bot.loadPlugin(pathfinder);
 
   return new Promise((resolve, reject) => {
+    // Reject a stalled connect (TCP open but no spawn — e.g. connecting while the
+    // server is mid-boot) so the reconnect loop can back off and retry instead
+    // of hanging forever on a dead attempt.
+    const timer = setTimeout(() => {
+      try {
+        bot.end();
+      } catch {
+        /* ignore */
+      }
+      reject(new Error("connect timed out (no spawn within 30s)"));
+    }, 30000);
+
     bot.once("spawn", () => {
+      clearTimeout(timer);
       const movements = new Movements(bot);
       movements.allowSprinting = true;
       movements.canDig = false; // following shouldn't tear up the world; skills opt in
@@ -30,7 +43,31 @@ export function createBot(cfg: Config): Promise<Bot> {
       log.info(`spawned as ${bot.username} on ${cfg.mc.host}:${cfg.mc.port}`);
       resolve(bot);
     });
-    bot.once("error", reject);
-    bot.once("kicked", (reason) => reject(new Error(`kicked: ${reason}`)));
+    bot.once("error", (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    bot.once("kicked", (reason) => {
+      clearTimeout(timer);
+      reject(new Error(`kicked: ${reason}`));
+    });
   });
+}
+
+/**
+ * Wire the "the connection died" events to a single handler, so the boot
+ * sequence can drive auto-reconnect. Fires at most once per bot instance.
+ */
+export function onBotDead(bot: Bot, handler: (reason: string) => void): void {
+  let fired = false;
+  const fire = (reason: string) => {
+    if (fired) return;
+    fired = true;
+    handler(reason);
+  };
+  bot.on("error", (e) => log.error("bot error:", e.message));
+  bot.once("end", (reason) => fire(`end: ${reason}`));
+  bot.once("kicked", (reason) =>
+    fire(`kicked: ${typeof reason === "string" ? reason : JSON.stringify(reason)}`),
+  );
 }

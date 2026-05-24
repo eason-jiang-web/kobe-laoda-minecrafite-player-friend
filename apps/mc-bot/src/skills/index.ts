@@ -2,7 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { RunSkillInput, type BotControl } from "@itto/shared";
 import type { Skill, SkillContext } from "./types.js";
 import { followPlayer } from "./follow-player.js";
-import { assistMining } from "./assist-mining.js";
+import { assistMining, mineVein } from "./assist-mining.js";
+import { chopTree } from "./chop-tree.js";
+import { collectDrops } from "./collect-drops.js";
 import { combatAssist } from "./combat-assist.js";
 import { fetchItem } from "./fetch-item.js";
 import { scoutAhead } from "./scout-ahead.js";
@@ -16,6 +18,9 @@ const log = logger("skills");
 export const SKILLS: Skill[] = [
   followPlayer,
   assistMining,
+  mineVein,
+  chopTree,
+  collectDrops,
   combatAssist,
   fetchItem,
   scoutAhead,
@@ -24,6 +29,21 @@ export const SKILLS: Skill[] = [
 ];
 
 const REGISTRY = new Map(SKILLS.map((s) => [s.name, s]));
+
+/**
+ * Run a skill by name. The single execution path used by BOTH the `run_skill`
+ * MCP tool and the goal runner — so there's one place skills actually fire.
+ * Throws on unknown skill or skill failure; callers wrap as they need.
+ */
+export async function runSkillByName(
+  ctx: SkillContext,
+  name: string,
+  args?: Record<string, unknown>,
+): Promise<string> {
+  const skill = REGISTRY.get(name);
+  if (!skill) throw new Error(`unknown skill: ${name}`);
+  return skill.run(ctx, args);
+}
 
 /**
  * Register the `run_skill` tool on the MCP server. Skills live in the app
@@ -36,15 +56,8 @@ export function registerSkillTools(server: McpServer, ctx: SkillContext): void {
     `Run a composite skill. Available: ${SKILLS.map((s) => s.name).join(", ")}.`,
     RunSkillInput.shape,
     async ({ name, args }) => {
-      const skill = REGISTRY.get(name);
-      if (!skill) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ ok: false, message: `unknown skill: ${name}` }) }],
-          isError: true,
-        };
-      }
       try {
-        const result = await skill.run(ctx, args);
+        const result = await runSkillByName(ctx, name, args);
         return { content: [{ type: "text" as const, text: JSON.stringify({ ok: true, message: result }) }] };
       } catch (e) {
         log.error(`skill ${name} failed`, (e as Error).message);

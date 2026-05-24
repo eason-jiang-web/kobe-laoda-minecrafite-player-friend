@@ -19,11 +19,18 @@ export class FastLoop {
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    private readonly bot: Bot,
+    private bot: Bot,
     private readonly cfg: Config,
   ) {
     this.follow = new FollowController(bot, cfg);
     this.safety = new SafetyReflexes(bot);
+  }
+
+  /** Re-point the loop (and its follow + safety) at a fresh connection. */
+  rebind(bot: Bot): void {
+    this.bot = bot;
+    this.follow.rebind(bot);
+    this.safety.rebind(bot);
   }
 
   start(): void {

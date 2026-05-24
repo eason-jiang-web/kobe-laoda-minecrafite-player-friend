@@ -1,12 +1,6 @@
 import type { Bot } from "mineflayer";
 import type { ChatLine, GameState, Vec3Lit } from "@itto/shared";
-
-/** Mobs we treat as "hostile" for the nearby-threat scan. */
-const HOSTILE = new Set([
-  "zombie", "husk", "drowned", "skeleton", "stray", "creeper",
-  "spider", "cave_spider", "enderman", "witch", "phantom", "pillager",
-  "vindicator", "ravager", "blaze", "ghast", "piglin", "hoglin", "warden",
-]);
+import { HOSTILE } from "./hostiles.js";
 
 /** Rolling chat buffer. The fast loop pushes into this; we snapshot it here. */
 const recentChat: ChatLine[] = [];
@@ -45,6 +39,27 @@ export function extractGameState(bot: Bot, ownerUsername: string): GameState {
 
   const heldItem = bot.heldItem?.name ?? null;
 
+  // Held tool durability, if the held item is damageable.
+  let heldDurability: { current: number; max: number } | undefined;
+  if (bot.heldItem) {
+    const max = bot.registry.items[bot.heldItem.type]?.maxDurability;
+    const used = (bot.heldItem as { durabilityUsed?: number }).durabilityUsed;
+    if (typeof max === "number" && max > 0 && typeof used === "number") {
+      heldDurability = { current: max - used, max };
+    }
+  }
+
+  // What the owner is currently aiming at — cheap raycast, guarded so it never throws.
+  let lookingAt: string | null = null;
+  if (player) {
+    try {
+      const lb = bot.blockAtEntityCursor(player, 6);
+      lookingAt = lb && lb.name !== "air" ? lb.name : null;
+    } catch {
+      lookingAt = null;
+    }
+  }
+
   return {
     at: Date.now(),
     timeOfDay: bot.time.timeOfDay,
@@ -54,6 +69,8 @@ export function extractGameState(bot: Bot, ownerUsername: string): GameState {
       health: Math.round(bot.health),
       food: Math.round(bot.food),
       heldItem,
+      lookingAt,
+      heldDurability,
       onGround: self.onGround,
       dimension: bot.game.dimension,
     },
@@ -69,5 +86,6 @@ export function extractGameState(bot: Bot, ownerUsername: string): GameState {
     recentChat: [...recentChat],
     inventory: bot.inventory.items().map((i) => ({ name: i.name, count: i.count })),
     followState: "IDLE", // overwritten by the fast loop's follow SM each tick
+    currentGoal: null, // stamped by the goal runner each tick (see index.ts)
   };
 }

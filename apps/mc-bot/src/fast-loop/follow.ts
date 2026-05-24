@@ -25,9 +25,17 @@ export class FollowController {
   private suspended = false;
 
   constructor(
-    private readonly bot: Bot,
+    private bot: Bot,
     private readonly cfg: Config,
   ) {}
+
+  /** Re-point at a fresh connection after a reconnect. */
+  rebind(bot: Bot): void {
+    this.bot = bot;
+    this.lastGoalPos = null;
+    this.state = "IDLE";
+    this.suspended = false;
+  }
 
   getState(): FollowState {
     return this.suspended ? "TASK" : this.state;

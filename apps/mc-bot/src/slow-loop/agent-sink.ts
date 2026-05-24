@@ -71,12 +71,15 @@ function buildPrompt(reason: string, state: GameState): string {
     "",
     `Something just happened in the Minecraft world worth a possible reaction: ${reason}`,
     "",
-    "Current world snapshot:",
+    "World snapshot (a moment old):",
     formatStateForPrompt(state),
     "",
-    "Respond IN CHARACTER as itto. To say something, call the itto-mc `chat` tool " +
-      "(one short, casual, lowercase line). You may also act via itto-mc tools " +
-      "(run_skill, move_to, etc.) if it fits. Do NOT reply on any other platform. " +
-      "If nothing genuinely warrants a response, do nothing at all.",
+    "How to act:",
+    "- This snapshot is stale by the time you read it. Before acting, read the `itto://state/current` resource for live state, and `itto://memory/world` for what itto already knows about this world (waypoints, chest contents).",
+    "- To talk, call the itto-mc `chat` tool: ONE short, casual, lowercase line. Mostly stay quiet.",
+    "- For anything multi-step (chop a tree, mine a vein, fetch an item, fight mobs), call `set_goal` with an intent instead of micromanaging — the body pursues it and pings you when it's done. Don't re-set a goal that's already active (check the goal line above).",
+    "- You have eyes: `find_blocks` (e.g. any_log, any_ore), `look_detect`, `nearby_blocks`. Use them to locate things before acting.",
+    "- Remember useful places with `remember_location` and chests with `index_chest`.",
+    "- Do NOT reply on any other platform. If nothing genuinely warrants a response, do nothing at all.",
   ].join("\n");
 }

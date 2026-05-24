@@ -1,8 +1,10 @@
-import type { GameState } from "@itto/shared";
+import type { BotGoal, GameState } from "@itto/shared";
 import { formatStateForPrompt } from "@itto/shared";
 import type { BotController } from "../bot/controller.js";
 import type { Config } from "../config.js";
-import { TRIGGERS, VibeCheck } from "./triggers.js";
+import type { WorldMemory } from "../memory/store.js";
+import type { GoalRunner } from "./goal-runner.js";
+import { TRIGGERS, MEMORY_TRIGGERS, VibeCheck } from "./triggers.js";
 import { logger } from "../util/logger.js";
 
 const log = logger("slow-loop");
@@ -35,11 +37,15 @@ export class SlowLoop {
   private prev: GameState | null = null;
   private readonly vibe = new VibeCheck();
   private lastNudgeAt = 0;
+  /** A goal that just finished, waiting to be surfaced to the brain once. */
+  private lastCompleted: BotGoal | null = null;
 
   constructor(
     private readonly controller: BotController,
     private readonly cfg: Config,
-    private readonly sink: NudgeSink = consoleNudgeSink,
+    private readonly sink: NudgeSink,
+    private readonly runner: GoalRunner,
+    private readonly memory: WorldMemory,
   ) {}
 
   start(): void {
@@ -57,20 +63,42 @@ export class SlowLoop {
     this.tick();
   }
 
-  private tick(): void {
-    const state = this.controller.getState();
+  /** The goal runner calls this when a goal finishes — surfaced next tick. */
+  notifyGoalComplete(goal: BotGoal): void {
+    this.lastCompleted = goal;
+  }
 
+  private tick(): void {
+    // advance any in-flight goal first, so its state shows in this snapshot
+    this.runner.tick();
+
+    const state = this.controller.getState();
     let reason: string | null = null;
-    for (const t of TRIGGERS) {
-      reason = t.check(state, this.prev);
-      if (reason) break;
+
+    // goal completion takes priority — it's the autonomy loop closing.
+    if (this.lastCompleted) {
+      const g = this.lastCompleted;
+      this.lastCompleted = null;
+      reason = `goal "${g.label}" ${g.status}${g.error ? `: ${g.error}` : g.progress ? ` (${g.progress})` : ""}`;
+    }
+    if (!reason) {
+      for (const t of TRIGGERS) {
+        reason = t.check(state, this.prev);
+        if (reason) break;
+      }
+    }
+    if (!reason) {
+      for (const t of MEMORY_TRIGGERS) {
+        reason = t.check(state, this.prev, this.memory);
+        if (reason) break;
+      }
     }
     if (!reason && this.vibe.due()) reason = "vibe check: comment on surroundings if interesting";
 
     this.prev = state;
     if (!reason) return;
 
-    // Global rate limit so we never spam Hermes/the player.
+    // Global rate limit so we never spam the brain/the player.
     if (Date.now() - this.lastNudgeAt < 2500) return;
     this.lastNudgeAt = Date.now();
 

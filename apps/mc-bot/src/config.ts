@@ -42,6 +42,12 @@ export interface Config {
     dir?: string;
     cooldownMs: number;
   };
+  reconnect: {
+    /** Auto-rejoin when kicked/disconnected (Minehut sleeps + kicks idle bots). */
+    enabled: boolean;
+    delayMs: number;
+    maxDelayMs: number;
+  };
   logLevel: string;
 }
 
@@ -70,6 +76,11 @@ export function loadConfig(): Config {
       cmd: (process.env.BRAIN_CMD ?? "").split(" ").filter(Boolean),
       dir: process.env.BRAIN_DIR || undefined,
       cooldownMs: num("BRAIN_COOLDOWN_MS", 10000),
+    },
+    reconnect: {
+      enabled: (process.env.RECONNECT_ENABLED ?? "true") !== "false",
+      delayMs: num("RECONNECT_DELAY_MS", 5000),
+      maxDelayMs: num("RECONNECT_MAX_DELAY_MS", 60000),
     },
     logLevel: process.env.LOG_LEVEL ?? "info",
   };

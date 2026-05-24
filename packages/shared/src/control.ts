@@ -1,4 +1,11 @@
-import type { GameState, Vec3Lit } from "./types.js";
+import type {
+  BlockQuery,
+  EntityInfo,
+  GameState,
+  LookedAtBlock,
+  NotableBlock,
+  Vec3Lit,
+} from "./types.js";
 
 /**
  * The single control surface over the Mineflayer bot.
@@ -35,4 +42,49 @@ export interface BotControl {
 
   /** Cancel any in-flight pathfinding / actions. The fast loop calls this on safety overrides. */
   stop(): void;
+
+  // ── Perception (on-demand; kept OUT of GameState to stay token-cheap) ──
+
+  /** Search nearby blocks by friendly name/alias. Returns coords, nearest-first. */
+  findBlocks(query: BlockQuery): Promise<Vec3Lit[]>;
+
+  /** What block the given player (default owner) is looking at, within maxDistance. */
+  lookingAt(opts?: { player?: string; maxDistance?: number }): Promise<LookedAtBlock | null>;
+
+  /** Cheap nearest-notable scan (logs/ores/water/chests). */
+  nearbyNotable(maxDistance?: number): Promise<NotableBlock[]>;
+
+  /** Unit direction the owner is facing (from yaw/pitch). For scouting ahead. */
+  playerHeading(player?: string): Vec3Lit | null;
+
+  // ── Mid-level action primitives (path-aware; composed by skills) ──
+
+  /** Pathfind adjacent to a block and mine it (auto-equips the best tool). */
+  digAt(pos: Vec3Lit): Promise<void>;
+
+  /** Path to + mine a list of coords in order, best-effort. Returns count mined. */
+  mineMany(positions: Vec3Lit[]): Promise<number>;
+
+  /** Walk to + pick up dropped item entities within radius. Returns count collected. */
+  collectNearbyDrops(opts?: { radius?: number; timeoutMs?: number }): Promise<number>;
+
+  /** Walk the X/Z columns of mined blocks so vanilla pickup grabs the drops. */
+  sweepColumns(positions: Vec3Lit[]): Promise<void>;
+
+  /** Craft `count` of an item by name; finds/uses a nearby crafting table if needed. */
+  craft(itemName: string, count?: number): Promise<void>;
+
+  /** Nearest hostile mob, optionally ranked by threat to a point (the player). */
+  nearestHostile(opts?: { maxDistance?: number; preferThreatTo?: Vec3Lit }): EntityInfo | null;
+
+  // ── Containers (M3 world memory) ──
+
+  /** Open a container at a coord, read its contents, close it. Container-side items only. */
+  readContainer(pos: Vec3Lit): Promise<Array<{ item: string; count: number }>>;
+
+  /** Open a container, withdraw up to `count` of `item`, close it. Returns amount taken. */
+  withdrawFromContainer(pos: Vec3Lit, item: string, count?: number): Promise<number>;
+
+  /** Current dimension string ("overworld" | "the_nether" | "the_end"). */
+  dimension(): string;
 }

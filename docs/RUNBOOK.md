@@ -33,6 +33,30 @@ bun run bot                 # bot + MCP server on :3001
 - Test tools/skills by hand (MCP inspector, or a small script hitting `:3001`).
 - When it works: `git push`. That's the whole handoff.
 
+### Fast local loop (offline docker, no brain, no Microsoft auth)
+
+For iterating on the body itself:
+
+```bash
+bun run mc:up        # local Paper server (offline mode, bot is op)
+bun run bot:dev      # bot in offline mode vs localhost, brain OFF (just logs nudges)
+```
+
+Then drive any tool/skill by hand with the MCP client (no brain needed):
+
+```bash
+bun run drive list                               # all tools + resources
+bun run drive read itto://state/current          # live world snapshot
+bun run drive find_blocks '{"name":"any_log"}'   # perception
+bun run drive run_skill chop_tree                # run a skill (blocks until done)
+bun run drive set_goal '{"intent":{"kind":"skill","name":"chop_tree"},"label":"get wood"}'
+```
+
+Long skills (chop/mine) should be driven via `set_goal`, not `run_skill` — the
+goal runs in the background and reports completion via the nudge channel, so it
+never blocks an MCP request. `bun test` runs the unit suite (memory, geometry,
+triggers).
+
 ## Friend — demo host
 
 Pulls your code and runs the full integrated stack on his machine.

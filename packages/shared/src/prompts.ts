@@ -41,9 +41,13 @@ export function formatStateForPrompt(s: GameState): string {
       ? "empty"
       : s.inventory.map((i) => `${i.name}x${i.count}`).join(", ");
 
+  const looking = s.self.lookingAt ? ` looking@${s.self.lookingAt}` : "";
+  const goal = s.currentGoal ? `${s.currentGoal.label} [${s.currentGoal.status}]` : "none";
+
   return [
     `time=${s.timeOfDay} (${s.timeOfDay < 13000 ? "day" : "night"})`,
-    `me: hp=${s.self.health} food=${s.self.food} holding=${s.self.heldItem ?? "nothing"} state=${s.followState}`,
+    `me: hp=${s.self.health} food=${s.self.food} holding=${s.self.heldItem ?? "nothing"} state=${s.followState}${looking}`,
+    `goal: ${goal}`,
     p
       ? `player ${p.username}: ${p.online ? `${p.distance ?? "?"}b away` : "offline"}`
       : "player: not found",

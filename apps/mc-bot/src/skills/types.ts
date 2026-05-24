@@ -1,4 +1,5 @@
 import type { BotControl } from "@itto/shared";
+import type { WorldMemory } from "../memory/store.js";
 
 /**
  * Skills are composite behaviors built on top of the primitive BotControl
@@ -9,6 +10,8 @@ import type { BotControl } from "@itto/shared";
  */
 export interface SkillContext {
   control: BotControl;
+  /** MC-specific world memory (chest index, waypoints) — used by fetch_item. */
+  memory: WorldMemory;
   /** Pause the follow SM so the bot can go do a task (TASK state). */
   suspendFollow(): void;
   /** Resume following once the task is done. */

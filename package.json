@@ -25,6 +25,7 @@
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist apps/web/.next"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "@types/bun": "^1.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.4.0"

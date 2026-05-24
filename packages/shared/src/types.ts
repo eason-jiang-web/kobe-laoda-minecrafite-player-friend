@@ -21,6 +21,36 @@ export interface EntityInfo {
   distance: number;
 }
 
+/** The block a player is currently looking at (raycast from their eyes). */
+export interface LookedAtBlock {
+  name: string;
+  pos: Vec3Lit;
+}
+
+/** One notable block surfaced by the cheap nearby scan. */
+export interface NotableBlock {
+  name: string;
+  pos: Vec3Lit;
+  distance: number;
+  category: "log" | "ore" | "water" | "chest" | "other";
+}
+
+/**
+ * On-demand block search request. `name` accepts a concrete block name
+ * ("oak_log", "diamond_ore") or a group alias ("any_log", "any_ore",
+ * "any_wood", "any_stone", "any_chest").
+ */
+export interface BlockQuery {
+  name: string;
+  maxDistance?: number;
+  count?: number;
+}
+
+/** Compact placement spec for build_helper. */
+export interface PlacementSpec {
+  placements: Array<{ pos: Vec3Lit; item: string }>;
+}
+
 export interface InventoryItem {
   name: string;
   count: number;
@@ -54,6 +84,10 @@ export interface GameState {
     health: number; // 0–20
     food: number; // 0–20
     heldItem: string | null;
+    /** Block the OWNER is currently looking at, if any (for "look at this"). */
+    lookingAt?: string | null;
+    /** Held tool durability, if the held item is damageable. */
+    heldDurability?: { current: number; max: number };
     onGround: boolean;
     dimension: string;
   };
@@ -68,10 +102,12 @@ export interface GameState {
   recentChat: ChatLine[];
   inventory: InventoryItem[];
   followState: FollowState;
+  /** The goal itto is currently pursuing (set by the brain via set_goal), if any. */
+  currentGoal: { id: string; label: string; status: GoalStatus; progress?: string } | null;
 }
 
 /**
- * High-level intent the slow loop / Hermes hands down to the executor.
+ * High-level intent the slow loop / brain hands down to the goal runner.
  * The fast loop never produces these — it only reacts.
  */
 export type BotIntent =
@@ -80,9 +116,59 @@ export type BotIntent =
   | { kind: "follow"; range?: number }
   | { kind: "stop" };
 
+export type GoalStatus = "active" | "done" | "failed" | "cancelled";
+
+/** A goal the brain set for itto to pursue across many ticks. */
+export interface BotGoal {
+  id: string;
+  intent: BotIntent;
+  /** Short human/LLM summary, e.g. "fetch 3 iron from the ore chest". */
+  label: string;
+  status: GoalStatus;
+  createdAt: number;
+  updatedAt: number;
+  progress?: string;
+  error?: string;
+}
+
 /** Result envelope returned by every MCP tool, kept uniform for Hermes. */
 export interface ToolResult {
   ok: boolean;
   message: string;
   data?: unknown;
+}
+
+// ── World memory (MC-specific spatial/factual store) ──
+
+/** A named place itto remembers: base, chest, point of interest, portal, spawn. */
+export interface Waypoint {
+  id: number;
+  name: string;
+  pos: Vec3Lit;
+  dimension: string;
+  kind: string;
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ChestRecord {
+  id: number;
+  pos: Vec3Lit;
+  dimension: string;
+  label?: string;
+  lastIndexedAt: number;
+}
+
+export interface ChestItem {
+  chestId: number;
+  item: string;
+  count: number;
+}
+
+/** What recall_locations / itto://memory/world surface to the brain. */
+export interface WorldMemorySnapshot {
+  waypoints: Waypoint[];
+  chests: Array<ChestRecord & { contents: Array<{ item: string; count: number }> }>;
+  notes: Array<{ id: number; text: string; at: number; session: string }>;
 }
