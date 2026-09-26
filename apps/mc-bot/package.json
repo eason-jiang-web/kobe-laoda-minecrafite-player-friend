@@ -25,6 +25,7 @@
     "mineflayer-pathfinder": "^2.4.5",
     "node-rsa": "^2.0.0",
     "opusscript": "^0.1.1",
+    "tslog": "^4.9.2",
     "vec3": "^0.1.10"
   },
   "devDependencies": {
