@@ -17,20 +17,18 @@ export const nav = [
   { label: "early access", href: "#cta" },
 ];
 
-// section 2 — "latest" → itto loops. Only real clip videos live here;
-// placeholder/default thumbnail cards were removed.
+// section 2 — "latest" → 展示用的卡片文案。
+// 上游的宣传片素材已移除（仓库瘦身），这里只留标题/署名/日期。
 export const clips = [
   {
     title: "Sakura Puddle",
     who: "CHERRY GROVE",
     date: "24—05—2026",
-    videoSrc: "/video/clip-sakura-puddle.mp4",
   },
   {
     title: "Trail for Two",
     who: "EXPLORATION",
     date: "24—05—2026",
-    videoSrc: "/video/clip-two-players-exploring.mp4",
   },
 ];
 

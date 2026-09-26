@@ -6,8 +6,8 @@ import gsap from "gsap";
 import { brand } from "@/lib/content";
 
 /**
- * 01 — Hero. Full-bleed cinematic background. The screen recording plays once,
- * then the generated hero loop fades in and repeats forever.
+ * 01 — Hero. Full-bleed cinematic background. 上游的两段宣传片已移除（仓库瘦身），
+ * 两个 <video> 现在是无源占位，画面为纯黑底；phase 逻辑保留，方便日后放回素材。
  *
  * Intro is a GSAP timeline, sequenced: (1) the itto logo scales in cleanly,
  * THEN (2) the whole frame racks into focus like a camera (uniform blur pull
@@ -92,7 +92,6 @@ export function Hero() {
         <video
           className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-out"
           style={{ opacity: phase === "intro" ? 1 : 0 }}
-          src="/video/hero-screen-recording.mp4"
           autoPlay
           muted
           playsInline
@@ -106,7 +105,6 @@ export function Hero() {
           ref={loopRef}
           className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-out"
           style={{ opacity: phase === "loop" ? 1 : 0 }}
-          src="/video/hero-loop.mp4"
           muted
           loop
           playsInline

@@ -7,7 +7,6 @@ type ClipHoverCardProps = {
   title: string;
   who: string;
   date: string;
-  videoSrc: string;
   mediaClassName: string;
 };
 
@@ -15,7 +14,6 @@ export function ClipHoverCard({
   title,
   who,
   date,
-  videoSrc,
   mediaClassName,
 }: ClipHoverCardProps) {
   const root = useRef<HTMLDivElement>(null);
@@ -73,19 +71,8 @@ export function ClipHoverCard({
   return (
     <div ref={root} className="group">
       <div className={`${mediaClassName} relative overflow-hidden bg-ink`}>
-        <div
-          ref={media}
-          className="absolute inset-0 h-full w-full"
-        >
-          <video
-            className="h-full w-full object-cover"
-            src={videoSrc}
-            autoPlay
-            muted
-            loop
-            playsInline
-          />
-        </div>
+        {/* 上游宣传片已移除（仓库瘦身）；容器保留，悬停缩放动画不受影响 */}
+        <div ref={media} className="absolute inset-0 h-full w-full" />
       </div>
       <div ref={caption} className="grid h-[41px] grid-cols-2 px-5 pt-3">
         <div>

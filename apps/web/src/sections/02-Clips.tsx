@@ -34,7 +34,6 @@ export function Clips() {
               title={clip.title}
               who={clip.who}
               date={clip.date}
-              videoSrc={clip.videoSrc}
               mediaClassName="h-[436px] w-full"
             />
           </Reveal>
