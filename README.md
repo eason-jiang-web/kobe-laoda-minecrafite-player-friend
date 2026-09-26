@@ -176,8 +176,8 @@ bun run doctor   → ✓ Bun 1.4.2   ✗ 没有 .env  → 教你先 Copy-Item .e
 > （把前缀换成你信得过的加速服务即可；只影响下载，代码本身没区别。）
 
 ```powershell
-git clone <这个仓库的地址>
-cd <项目目录>
+git clone https://github.com/eason-jiang-web/kobe-laoda-minecrafite-player-friend.git
+cd kobe-laoda-minecrafite-player-friend
 bun install
 
 Copy-Item .env.example .env
