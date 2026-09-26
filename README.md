@@ -31,6 +31,10 @@
 **需要什么**：Windows、[Bun](https://bun.sh)、一个 Minecraft Java 版世界（原版即可，1.7~1.21 里 mineflayer 认识的版本）、
 一个 [DeepSeek API key](https://platform.deepseek.com)（很便宜，一天几分钱）。
 
+> **网络提示（中国大陆）**：直连 `github.com` 常常超时。可以挂代理，或用 GitHub 加速前缀来 clone，例如：
+> `git clone https://githubproxy.cc/https://github.com/eason-jiang-web/kobe-laoda-minecrafite-player-friend.git`
+> （把前缀换成你信得过的加速服务即可；只影响下载，代码本身没区别。）
+
 ```powershell
 git clone <这个仓库的地址>
 cd <项目目录>
