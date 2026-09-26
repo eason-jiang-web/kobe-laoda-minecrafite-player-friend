@@ -122,7 +122,9 @@ export function registerMemoryTools(server: McpServer, memory: WorldMemory, cont
    */
   server.tool(
     "ask_player",
-    "问他一个你**真的没法自己决定**的问题。注意：**这个问题会直接说在游戏里**，" +
+    "问他一个**只有他知道**的问题 —— 他的意思、他的偏好、他指的地方（「那边」是哪边）。" +
+      "**游戏知识不要用这个问**（数值、机制、生成条件、配方）：那些自己查 wiki_notes / wiki_lookup，" +
+      "查得到就别拿来烦他。注意：**这个问题会直接说在游戏里**，" +
       "所以调完它不要再 chat 一遍同样的话（那就成复读机了）。同一件事最多问 " +
       DEFAULT_ASK_POLICY.maxPerTopic +
       " 次，问满会被拒绝 —— 那时候别再绕圈子，按最合理的假设直接开工，再用 chat 说一句你的理解。" +
