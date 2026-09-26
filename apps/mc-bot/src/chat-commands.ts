@@ -33,6 +33,8 @@ export interface CommandContext {
   follow: { setFreeRoam(on: boolean): void; isFreeRoam(): boolean };
   /** 目标执行器：让 #stop / #cancel 能丢掉当前任务，并报出丢掉的是哪个。 */
   runner: { cancel(): void; currentGoal(): { label: string } | null };
+  /** 边玩边学攒下来的画像（他的习惯 + 你的熟练度）一句话版。 */
+  profile?: () => string;
 }
 
 export interface ChatCommand {
@@ -317,6 +319,20 @@ export const COMMANDS: ChatCommand[] = [
       return n === 0
         ? `行，${groupLabel(key)} 不限量了。` + detail
         : `行，${groupLabel(key)} 的上限改成 ${Math.round(n)} 了。` + detail;
+    },
+  },
+  {
+    trigger: "#profile",
+    help: "#profile —— 看我玩出来的经验（他的习惯 + 我的熟练度）",
+    detail: [
+      "看我这一路攒下来的经验：我的熟练度（挖矿/打架/盖东西…按真实成败算）",
+      "加他的习惯（常打哪些指令、几点上线、说话长短）和记下的教训。",
+      "数据存在 data/world.db，边玩边长 —— 换个存档是另一份。",
+      "想让我少问问题也可以直接说「别问了，你自己看着办」。",
+    ],
+    run: async (ctx) => {
+      // 纯读本地数据，不走大脑、不花钱、瞬间回。
+      return ctx.profile?.() ?? "还没玩出什么名堂 —— 多带我干点活，我就记住了。";
     },
   },
   {

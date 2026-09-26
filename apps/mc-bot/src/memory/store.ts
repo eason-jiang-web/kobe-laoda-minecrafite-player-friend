@@ -1,9 +1,20 @@
 import { Database } from "bun:sqlite";
-import type {
-  ChestRecord,
-  Vec3Lit,
-  Waypoint,
-  WorldMemorySnapshot,
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import {
+  askHint,
+  DEFAULT_ASK_POLICY,
+  profileBrief,
+  profileDigest,
+  type AdaptCount,
+  type AskRecord,
+  type ChestRecord,
+  type HabitCount,
+  type Lesson,
+  type PlayerProfile,
+  type Vec3Lit,
+  type Waypoint,
+  type WorldMemorySnapshot,
 } from "@itto/shared";
 
 /**
@@ -18,9 +29,13 @@ import type {
  */
 export class WorldMemory {
   private readonly db: Database;
+  /** 画像摘要写到哪 —— 大脑是另一个进程，只能读文件（和自修笔记一个套路）。 */
+  private readonly digestPath?: string;
+  private digestTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, opts: { digestPath?: string } = {}) {
     this.db = new Database(dbPath, { create: true });
+    this.digestPath = opts.digestPath;
     this.db.run("PRAGMA journal_mode = WAL;");
     this.db.run("PRAGMA foreign_keys = ON;");
     this.migrate();
@@ -57,6 +72,39 @@ export class WorldMemory {
       text TEXT NOT NULL,
       at INTEGER NOT NULL,
       session TEXT NOT NULL
+    );`);
+    // 追问预算：同一个话题问了几次（见 packages/shared/src/ask-budget.ts）
+    this.db.run(`CREATE TABLE IF NOT EXISTS asks (
+      key TEXT PRIMARY KEY,
+      count INTEGER NOT NULL,
+      last_at INTEGER NOT NULL,
+      last_question TEXT NOT NULL
+    );`);
+    // 他的习惯：指令次数、在线时段、说话长度……
+    this.db.run(`CREATE TABLE IF NOT EXISTS habits (
+      key TEXT PRIMARY KEY,
+      n INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );`);
+    // 你的熟练度：每门本事试了几次、成了几次
+    this.db.run(`CREATE TABLE IF NOT EXISTS adaptation (
+      area TEXT PRIMARY KEY,
+      attempts INTEGER NOT NULL,
+      successes INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );`);
+    // 一点点上下文（比如"他最后说了什么"）—— 追问额度按这个算，模型改名也没用
+    this.db.run(`CREATE TABLE IF NOT EXISTS kv (
+      k TEXT PRIMARY KEY,
+      v TEXT NOT NULL,
+      at INTEGER NOT NULL
+    );`);
+    // 教训 / 偏好（大脑自己写的）
+    this.db.run(`CREATE TABLE IF NOT EXISTS lessons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      area TEXT NOT NULL,
+      text TEXT NOT NULL,
+      at INTEGER NOT NULL
     );`);
   }
 
@@ -175,6 +223,145 @@ export class WorldMemory {
       .all({ $limit: limit }) as Array<{ id: number; text: string; at: number; session: string }>;
   }
 
+  // ── 追问预算 ────────────────────────────────────────────────────────────
+
+  askRecords(): AskRecord[] {
+    const rows = this.db.query(`SELECT key,count,last_at,last_question FROM asks`).all() as Array<{
+      key: string;
+      count: number;
+      last_at: number;
+      last_question: string;
+    }>;
+    return rows.map((r) => ({
+      key: r.key,
+      count: r.count,
+      lastAt: r.last_at,
+      lastQuestion: r.last_question,
+    }));
+  }
+
+  saveAskRecords(records: AskRecord[]): void {
+    this.db.run(`DELETE FROM asks`);
+    const ins = this.db.query(`INSERT INTO asks (key,count,last_at,last_question) VALUES ($k,$c,$t,$q)`);
+    for (const r of records) {
+      ins.run({ $k: r.key, $c: r.count, $t: r.lastAt, $q: r.lastQuestion });
+    }
+  }
+
+  /** 「这件事别再问了」那行提示（有话题问满时才有）。 */
+  askHintLine(now = Date.now()): string | null {
+    return askHint(this.askRecords(), now, DEFAULT_ASK_POLICY);
+  }
+
+  setKv(k: string, v: string): void {
+    this.db
+      .query(
+        `INSERT INTO kv (k,v,at) VALUES ($k,$v,$t)
+         ON CONFLICT(k) DO UPDATE SET v = $v, at = $t`,
+      )
+      .run({ $k: k, $v: v, $t: Date.now() });
+  }
+
+  getKv(k: string): string | null {
+    const row = this.db.query(`SELECT v FROM kv WHERE k=$k`).get({ $k: k }) as { v: string } | null;
+    return row ? row.v : null;
+  }
+
+  // ── 他的习惯 / 你的熟练度 / 教训 ────────────────────────────────────────
+
+  bumpHabit(key: string, by = 1): void {
+    this.db
+      .query(
+        `INSERT INTO habits (key,n,updated_at) VALUES ($k,$n,$t)
+         ON CONFLICT(key) DO UPDATE SET n = n + $n, updated_at = $t`,
+      )
+      .run({ $k: key, $n: by, $t: Date.now() });
+    this.scheduleDigest();
+  }
+
+  noteOutcome(area: string, ok: boolean): void {
+    this.db
+      .query(
+        `INSERT INTO adaptation (area,attempts,successes,updated_at) VALUES ($a,1,$s,$t)
+         ON CONFLICT(area) DO UPDATE SET attempts = attempts + 1, successes = successes + $s, updated_at = $t`,
+      )
+      .run({ $a: area, $s: ok ? 1 : 0, $t: Date.now() });
+    this.scheduleDigest();
+  }
+
+  addLesson(area: string, text: string): void {
+    const clean = text.trim().slice(0, 200);
+    if (clean.length === 0) return;
+    // 同一句话只记一次 —— 重复记等于没记
+    const dup = this.db.query(`SELECT id FROM lessons WHERE area=$a AND text=$t`).get({ $a: area, $t: clean });
+    if (dup) return;
+    this.db
+      .query(`INSERT INTO lessons (area,text,at) VALUES ($a,$t,$now)`)
+      .run({ $a: area, $t: clean, $now: Date.now() });
+    this.scheduleDigest();
+  }
+
+  profile(lessonLimit = 20): PlayerProfile {
+    const habits = this.db.query(`SELECT key,n,updated_at FROM habits`).all() as Array<{
+      key: string;
+      n: number;
+      updated_at: number;
+    }>;
+    const adaptation = this.db.query(`SELECT area,attempts,successes,updated_at FROM adaptation`).all() as Array<{
+      area: string;
+      attempts: number;
+      successes: number;
+      updated_at: number;
+    }>;
+    const lessons = this.db
+      .query(`SELECT area,text,at FROM lessons ORDER BY at DESC LIMIT $l`)
+      .all({ $l: lessonLimit }) as Lesson[];
+    return {
+      habits: habits.map((h): HabitCount => ({ key: h.key, n: h.n, updatedAt: h.updated_at })),
+      adaptation: adaptation.map(
+        (a): AdaptCount => ({ area: a.area, attempts: a.attempts, successes: a.successes, updatedAt: a.updated_at }),
+      ),
+      lessons,
+    };
+  }
+
+  /** 游戏里 #profile 那一句。 */
+  briefText(): string {
+    return profileBrief(this.profile());
+  }
+
+  /** 喂给大脑的那段（也写到 digestPath）。 */
+  digestText(): string {
+    return profileDigest(this.profile());
+  }
+
+  /**
+   * 画像变了就把摘要写出去（防抖 1.5 秒 —— 习惯是高频写入，不能每句都落盘）。
+   */
+  private scheduleDigest(): void {
+    if (!this.digestPath || this.digestTimer !== null) return;
+    const timer = setTimeout(() => {
+      this.digestTimer = null;
+      this.writeDigest();
+    }, 1500);
+    (timer as unknown as { unref?: () => void }).unref?.();
+    this.digestTimer = timer;
+  }
+
+  /** 立刻写一次，返回写出去的内容。 */
+  writeDigest(): string {
+    const text = this.digestText();
+    if (this.digestPath) {
+      try {
+        mkdirSync(dirname(this.digestPath), { recursive: true });
+        writeFileSync(this.digestPath, text, "utf8");
+      } catch {
+        // 摘要写不出去不该影响玩
+      }
+    }
+    return text;
+  }
+
   // ── Snapshot / lifecycle ───────────────────────────────────────────────
 
   snapshot(): WorldMemorySnapshot {
@@ -190,6 +377,11 @@ export class WorldMemory {
   }
 
   close(): void {
+    if (this.digestTimer !== null) {
+      clearTimeout(this.digestTimer);
+      this.digestTimer = null;
+      this.writeDigest();
+    }
     this.db.close();
   }
 }

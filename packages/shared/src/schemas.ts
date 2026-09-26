@@ -205,4 +205,31 @@ export const RecallNotesInput = z.object({
   limit: z.number().int().positive().optional().describe("How many recent notes (default 10, max 50)"),
 });
 
+// ── 追问预算 + 经验积累（见 packages/shared/src/ask-budget.ts / profile.ts）──
+
+export const AskPlayerInput = z.object({
+  question: z.string().describe("What to ask him, in one short Chinese line (this is spoken in game chat)"),
+  topic: z
+    .string()
+    .optional()
+    .describe(
+      "A short stable key for WHAT you are asking about (e.g. 「where to build」). Same topic twice = same key. "
+        + "The body caps how many times one topic may be asked — after that it refuses and tells you to decide yourself.",
+    ),
+});
+
+export const NoteExperienceInput = z.object({
+  area: z
+    .string()
+    .describe("mining | combat | building | gathering | exploring | farming | crafting | navigation | preference | lesson"),
+  outcome: z
+    .enum(["success", "fail"])
+    .optional()
+    .describe("Did the thing you just tried work? Omit when you are only recording a lesson/preference."),
+  lesson: z
+    .string()
+    .optional()
+    .describe("One short line worth keeping: a lesson (「晚上别在平原乱走」) or a preference (「他喜欢挖矿，不喜欢下矿洞」)"),
+});
+
 // （语音相关的东西已经删掉了：牢大只在游戏聊天里说话。）

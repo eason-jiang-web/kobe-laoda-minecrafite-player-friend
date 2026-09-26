@@ -26,6 +26,11 @@ export interface AgentBrainConfig {
   cooldownMs: number;
   /** Shorter cooldown for priority nudges (someone is talking to you). */
   chatCooldownMs?: number;
+  /**
+   * 每次唤醒前算一段额外提示（追问额度、画像提醒……）。返回空/null 就不加。
+   * 由 index.ts 接上 memory —— 这里不认识 WorldMemory，保持解耦。
+   */
+  extraPrompt?: () => string | null;
 }
 
 const PERSONA =
@@ -44,7 +49,7 @@ export function createAgentBrainSink(cfg: AgentBrainConfig): NudgeSink {
     lastAt = Date.now();
     inflight = true;
 
-    const prompt = buildPrompt(reason, state);
+    const prompt = buildPrompt(reason, state, cfg.extraPrompt?.() ?? null);
     try {
       const proc = Bun.spawn([...cfg.cmd, prompt], {
         cwd: cfg.dir,
@@ -114,7 +119,7 @@ export function createAgentBrainSink(cfg: AgentBrainConfig): NudgeSink {
   };
 }
 
-function buildPrompt(reason: string, state: GameState): string {
+function buildPrompt(reason: string, state: GameState, extra: string | null = null): string {
   return [
     PERSONA,
     "",
@@ -131,6 +136,13 @@ function buildPrompt(reason: string, state: GameState): string {
     "- 他在跟你说话就直接回：一两句，别装没听见，也别答非所问。",
     "- 如果这次唤醒写的是「自由活动」，那是让你自己找事做：用 set_goal 排一个（砍树/挖矿/探路/盖东西都行），再跟他说一句你打算干嘛。",
     "- 一次唤醒一般就一句 chat，别把同一个意思换个说法再说一遍。",
+    "- 他指代不清（「去那边」「老地方」「那个东西」）或者要动他的东西 → 用 `ask_player` 问一句，" +
+      "**同一件事最多 3 次**；三次还没说清就挑最合理的解释直接开工，再用 chat 说一句你的理解。" +
+      "自己看一眼就知道的别问。他一说话你就得出声，别憋着。",
+    "- 干完一件事回头记一笔：`note_experience`（某门本事成了/砸了，或者一句教训/他的偏好）。" +
+      "下次唤醒你会带着这份经验 —— 越玩越懂他。",
     "- 不要在别的平台回复。如果确实没什么值得说的，就什么都不做。",
+    // 追问额度这类提醒放在**最后**：模型对末尾的指令最敏感。
+    extra && extra.trim().length > 0 ? "\n" + extra : "",
   ].join("\n");
 }

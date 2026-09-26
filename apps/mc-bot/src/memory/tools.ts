@@ -1,10 +1,19 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ok, fail } from "@itto/mcp-server";
 import {
+  AskPlayerInput,
+  areaLabel,
+  askKey,
+  decideAsk,
+  DEFAULT_ASK_POLICY,
   ForgetLocationInput,
+  HABIT,
   IndexChestInput,
+  isSkillArea,
+  NoteExperienceInput,
   RecallLocationsInput,
   RecallNotesInput,
+  recordAsk,
   RememberLocationInput,
   RememberNoteInput,
   type BotControl,
@@ -105,6 +114,94 @@ export function registerMemoryTools(server: McpServer, memory: WorldMemory, cont
         return fail((e as Error).message);
       }
     },
+  );
+
+  /**
+   * 追问预算的出口。**这是唯一允许"问他"的方式** —— 直接在 chat 里连问三句
+   * 是绕不过额度检查的，所以提示词里要求：拿不准就先调这个。
+   */
+  server.tool(
+    "ask_player",
+    "问他一个你**真的没法自己决定**的问题。注意：**这个问题会直接说在游戏里**，" +
+      "所以调完它不要再 chat 一遍同样的话（那就成复读机了）。同一件事最多问 " +
+      DEFAULT_ASK_POLICY.maxPerTopic +
+      " 次，问满会被拒绝 —— 那时候别再绕圈子，按最合理的假设直接开工，再用 chat 说一句你的理解。" +
+      "能自己试出来的（砍哪棵树、走哪条路）就别问。",
+    AskPlayerInput.shape,
+    async ({ question, topic }) => {
+      try {
+        const now = Date.now();
+        const records = memory.askRecords();
+        // 额度按**他最后说的那件事**算，而不是按模型自己起的 topic ——
+        // 实测模型会给同一件事换名字（"挖矿方向" → "wheretomine"），那样就能无限问下去。
+        const request = memory.getKv("last_request");
+        const key = request && request.trim().length > 0 ? "req:" + askKey(undefined, request) : askKey(topic, question);
+        const verdict = decideAsk(records, key, question, now);
+        if (!verdict.allowed) return fail(verdict.why ?? "别再问了，自己拍板");
+
+        const line = question.trim().slice(0, 200);
+        memory.saveAskRecords(recordAsk(records, key, line, now));
+        memory.bumpHabit(HABIT.asked);
+        await control.chat(line);
+        const total = verdict.count + verdict.remaining;
+        return ok(`asked (${verdict.count}/${total}): ${line}`, {
+          asked: verdict.count,
+          remaining: verdict.remaining,
+        });
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
+  /**
+   * 边玩边学：把这一趟的结果/教训写回画像。下一次唤醒的系统提示词里就有它。
+   */
+  server.tool(
+    "note_experience",
+    "把这一趟玩出来的东西记下来，越玩越准：某门本事成了/砸了（outcome），或者一条教训/" +
+      "他的偏好（lesson）。记下来的东西下次唤醒时会在你的系统提示词里。只记**下次用得上**的，" +
+      "别记流水账（「我挖了 3 个铁矿」这种不用记，背包里有）。",
+    NoteExperienceInput.shape,
+    async ({ area, outcome, lesson }) => {
+      try {
+        const bits: string[] = [];
+        if (outcome && isSkillArea(area)) {
+          memory.noteOutcome(area, outcome === "success");
+          bits.push(areaLabel(area) + (outcome === "success" ? " 记一次成功" : " 记一次失败"));
+        }
+        const text = (lesson ?? "").trim();
+        if (text.length > 0) {
+          memory.addLesson(area, text);
+          bits.push("记住：" + text);
+        }
+        if (bits.length === 0) {
+          return fail("要么给 outcome（并且 area 是本事），要么给 lesson —— 不然没东西可记");
+        }
+        return ok(bits.join("；"));
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
+  server.resource(
+    "player-profile",
+    "itto://profile/current",
+    {
+      description:
+        "你自己的经验档案：他的习惯（指令/时段/说话长度）、你每门本事的成败、记下的教训和偏好（JSON）。",
+      mimeType: "application/json",
+    },
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify({ ...memory.profile(), digest: memory.digestText() }, null, 2),
+        },
+      ],
+    }),
   );
 
   server.resource(

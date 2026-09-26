@@ -28,6 +28,7 @@ import { connectWithRetry, shouldExplain } from "./util/connect-retry.js";
 import { assertSupportedVersion } from "./bot/versions.js";
 import { currentCaps } from "./value-caps.js";
 import { setLogLevel, logger } from "./util/logger.js";
+import { areaForGoal, HABIT } from "@itto/shared";
 
 const log = logger("main");
 
@@ -124,7 +125,9 @@ async function main() {
   // world memory: MC-specific spatial facts (waypoints, chest index). Survives
   // reconnects + restarts. Persisted to data/world.db at the repo root.
   mkdirSync("data", { recursive: true });
-  const memory = new WorldMemory("data/world.db");
+  // 画像摘要单独写一个文件：大脑是另一个进程（每次唤醒新开），只能读文件 ——
+  // 和自修笔记（data/wiki/notes.json）一个套路。
+  const memory = new WorldMemory("data/world.db", { digestPath: "data/profile-digest.txt" });
 
   // 3 — fast loop owns the follow controller; the state extractor reads its state
   const fast = new FastLoop(bot, cfg);
@@ -142,7 +145,18 @@ async function main() {
     runSkill: (name, args) => runSkillByName(skillCtx, name, args),
     suspendFollow: () => fast.follow.suspend(),
     resumeFollow: () => fast.follow.resume(),
-    onComplete: (goal) => slow.notifyGoalComplete(goal),
+    onComplete: (goal) => {
+      // 边玩边长本事：这个任务算哪门子功夫，成了还是砸了。
+      // 认不出来的（say / follow / 自由活动）就不记 —— 熟练度只统计真干过的活。
+      const intent = goal.intent;
+      const area = areaForGoal(
+        intent.kind,
+        intent.kind === "skill" ? intent.name : undefined,
+        intent.kind === "collect" ? intent.item : undefined,
+      );
+      if (area) memory.noteOutcome(area, goal.status === "done");
+      slow.notifyGoalComplete(goal);
+    },
   });
 
   if (voice) {
@@ -188,6 +202,8 @@ async function main() {
           dir: cfg.brain.dir,
           cooldownMs: cfg.brain.cooldownMs,
           chatCooldownMs: cfg.brain.chatCooldownMs,
+          // 「这件事别再问了」的第二道保险：开口之前就让它知道额度用完了
+          extraPrompt: () => memory.askHintLine(),
         })
       : consoleNudgeSink;
   if (cfg.brain.enabled) log.info("brain: external agent");
@@ -236,11 +252,22 @@ async function main() {
     // never enter the chat buffer — so the brain can't answer the same line a
     // second time on its next wake.
     if (username.toLowerCase() === cfg.mc.ownerUsername.toLowerCase()) {
+      // 他的习惯是**白捡**的：不用模型、不用额外回合，来一句话就记一笔。
+      // 攒够了写进 data/profile-digest.txt，大脑下次醒来就知道他怎么玩。
+      // 追问额度按"他最后说的这件事"算（模型换个 topic 名字也绕不过去）
+      memory.setKv("last_request", message);
+      memory.bumpHabit(HABIT.chat);
+      memory.bumpHabit(HABIT.chatChars, message.length);
+      memory.bumpHabit(HABIT.hour(new Date().getHours()));
+      const lower = message.toLowerCase();
+      if (cfg.mc.wakeWords.some((w) => lower.includes(w.toLowerCase()))) memory.bumpHabit(HABIT.wake);
+
       const hit = matchCommand(message);
       if (hit) {
+        memory.bumpHabit(HABIT.command(hit.command.trigger));
         log.info(`command ${hit.command.trigger}${hit.arg ? " " + hit.arg : ""} from ${username}`);
         void hit.command
-          .run({ control: controller, follow: fast.follow, runner }, hit.arg)
+          .run({ control: controller, follow: fast.follow, runner, profile: () => memory.briefText() }, hit.arg)
           .then((reply) => (reply ? controller.chat(reply) : undefined))
           .catch((e) => log.warn(`command ${hit.command.trigger} failed: ${(e as Error).message}`));
         return;

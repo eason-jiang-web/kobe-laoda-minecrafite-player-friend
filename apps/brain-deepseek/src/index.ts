@@ -27,6 +27,7 @@
  *   BRAIN_MAX_TOKENS          default 2048
  *   BRAIN_TEMPERATURE         default 0.8
  *   BRAIN_HISTORY_PATH        default data/brain-history.json
+ *   BRAIN_PROFILE_PATH        default data/profile-digest.txt (他的习惯+你的熟练度，身体写的)
  *   BRAIN_HISTORY_KEEP        default 24
  *   BRAIN_DEBUG=1             verbose trace on stderr
  *
@@ -74,6 +75,8 @@ interface BrainConfig {
   historyKeep: number;
   /** 自修笔记的路径（见 apps/brain-deepseek/scripts/study-wiki.ts）。 */
   wikiNotesPath: string;
+  /** 画像摘要的路径（mc-bot 边玩边写：他的习惯 + 你的熟练度 + 教训）。 */
+  profilePath: string;
   /** Write one JSONL line per wake into data/training (see training-log.ts). */
   trainLog: boolean;
   /** Also store the full prompt (big files, but complete training pairs). */
@@ -103,6 +106,7 @@ function loadConfig(): BrainConfig {
     historyPath: process.env.BRAIN_HISTORY_PATH ?? "data/brain-history.json",
     /** 自修笔记（bun run study:wiki 的产物）—— 要点会常驻系统提示词。 */
     wikiNotesPath: process.env.BRAIN_WIKI_NOTES_PATH ?? "data/wiki/notes.json",
+    profilePath: process.env.BRAIN_PROFILE_PATH ?? "data/profile-digest.txt",
     historyKeep: num("BRAIN_HISTORY_KEEP", 24),
     trainLog: (process.env.BRAIN_TRAIN_LOG ?? "1") !== "0",
     trainFullPrompt: process.env.BRAIN_TRAIN_FULL === "1",
@@ -130,6 +134,17 @@ function loadWikiNotes(path: string): WikiNotes | null {
   }
 }
 
+/**
+ * 读身体写的画像摘要。没有/坏了都返回空串 —— 经验读不到不该影响开工。
+ */
+function loadProfileDigest(path: string): string {
+  try {
+    return readFileSync(path, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
 async function readPrompt(): Promise<string> {
   const args = process.argv.slice(2);
   if (args[0] === "-") {
@@ -145,7 +160,11 @@ async function readPrompt(): Promise<string> {
  * — the same one Hermes would get — and everything below is the operational
  * reality of being woken up inside a running Minecraft world.
  */
-function buildSystemPrompt(resources: McpResource[], wikiNotes: WikiNotes | null): string {
+function buildSystemPrompt(
+  resources: McpResource[],
+  wikiNotes: WikiNotes | null,
+  profileText: string,
+): string {
   const lines = [
     SYSTEM_PROMPT,
     "",
@@ -155,6 +174,9 @@ function buildSystemPrompt(resources: McpResource[], wikiNotes: WikiNotes | null
     // 它自己读 wiki 学来的笔记（bun run study:wiki 的产物）。
     // 同样是稳定前缀 —— 常驻不贵，但比"凭印象"准得多。
     notesDigest(wikiNotes),
+    // 边玩边攒的画像（他的习惯 / 你的熟练度 / 教训）。身体写文件、这里读进来。
+    // 放在静态常识后面 = 前面那截稳定前缀还能吃到上下文缓存。
+    profileText,
     "",
     "## How you are running right now / 你现在是怎么跑的",
     "你是牢大（Laoda）的大脑：一个 Mineflayer 机器人正站在你兄弟的 Minecraft 世界里。"
@@ -193,6 +215,18 @@ function buildSystemPrompt(resources: McpResource[], wikiNotes: WikiNotes | null
       + "只有版本细节、具体数值、生成条件这类容易记混的才查。查到什么就按什么说，并可以说一句「我刚查了 wiki」。",
     "- 该干嘛拿不准时调 assess_progress：给你主线进度（走到第几步、这步该做什么）+ 每项工程"
       + "（农场/储物间/刷怪塔/传送门/附魔台/铁傀儡农场…）的开工条件和缺料清单。纯计算，免费，随便调。",
+    "- **该问就问，但最多三次**：他说话指代不清的时候（「去那边」「老地方」「那个东西」「随便弄点」），"
+      + "或者要动他的东西（丢装备、拆建筑、下界这类不可逆的）→ 用 ask_player 问一句，"
+      + "别自己瞎猜然后跑冤枉路。**ask_player 本身就是说话** —— 调完它别再 chat 一遍同样的问题。"
+      + "**同一件事最多 3 次**：问到第三次还没说清，"
+      + "就挑最合理的解释直接开工，再用 chat 说一句你的理解（「行，那我往你左手边那片林子去」）。"
+      + "自己看一眼就知道的（附近有什么怪、手上有没有镐子）别问。",
+    "- **他跟你说话，你必须出声**：哪怕只是一句「行，我这就去」也比一声不吭强 —— "
+      + "憋着不说话，他会以为你坏了。真不知道该干嘛就问一句（ask_player），"
+      + "或者先按最合理的理解动起来再告诉他。",
+    "- **越玩越懂他**：干完一件事顺手调 note_experience 记一笔 —— 某门本事成了/砸了（outcome），"
+      + "或者一句教训/他的偏好（lesson）。记下来的东西下次唤醒会出现在上面的经验区里。"
+      + "只记下次用得上的，别记流水账。想知道自己现在什么水平就看 itto://profile/current。",
     "- Keep durable facts: remember_location for places, index_chest for chest contents, "
       + "remember_note for plans/promises/preferences, recall_notes + itto://memory/world to read them back.",
     "- 有人在跟你说话就直接回 —— 一两句，别装没听见，也别答非所问。这是聊天，不是播报。",
@@ -353,7 +387,11 @@ async function main(): Promise<void> {
     // 自修笔记（bun run study:wiki 产生）。读不到就当作没有 —— 不影响正常开工。
     const wikiNotes = loadWikiNotes(cfg.wikiNotesPath);
     if (wikiNotes) trace(cfg, "wiki notes: " + wikiNotes.notes.length + " 条");
-    const messages: ChatMessage[] = [{ role: "system", content: buildSystemPrompt(resources, wikiNotes) }];
+    const profileText = loadProfileDigest(cfg.profilePath);
+    if (profileText.length > 0) trace(cfg, "profile digest: " + profileText.length + " chars");
+    const messages: ChatMessage[] = [
+      { role: "system", content: buildSystemPrompt(resources, wikiNotes, profileText) },
+    ];
     const priorContext = formatHistory(history);
     if (priorContext.length > 0) {
       messages.push({
