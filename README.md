@@ -172,12 +172,12 @@ bun run doctor   → ✓ Bun 1.4.2   ✗ 没有 .env  → 教你先 Copy-Item .e
 一个 [DeepSeek API key](https://platform.deepseek.com)（很便宜，一天几分钱）。
 
 > **网络提示（中国大陆）**：直连 `github.com` 常常超时。可以挂代理，或用 GitHub 加速前缀来 clone，例如：
-> `git clone https://githubproxy.cc/https://github.com/eason-jiang-web/kobe-laoda-minecrafite-player-friend.git`
+> `git clone https://githubproxy.cc/https://github.com/eason-jiang-web/kobe-laoda-minecraft-player-friend.git`
 > （把前缀换成你信得过的加速服务即可；只影响下载，代码本身没区别。）
 
 ```powershell
-git clone https://github.com/eason-jiang-web/kobe-laoda-minecrafite-player-friend.git
-cd kobe-laoda-minecrafite-player-friend
+git clone https://github.com/eason-jiang-web/kobe-laoda-minecraft-player-friend.git
+cd kobe-laoda-minecraft-player-friend
 bun install
 
 Copy-Item .env.example .env
