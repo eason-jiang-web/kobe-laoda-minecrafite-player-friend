@@ -68,6 +68,16 @@ export interface Endpoint {
 }
 
 /**
+ * 大脑状态。关着的时候机器人一句话都不说，所以终端必须明说 ——
+ * 见 brainLines() 上面那段注释。
+ */
+export interface BrainStatus {
+  enabled: boolean;
+  /** BRAIN_CMD 拼回来的字符串；空 = 没配。 */
+  cmd?: string;
+}
+
+/**
  * 端口这一条必须反复说 —— 游戏里「对局域网开放」给的端口**默认是随机的**，
  * 大多数人直接点确定，于是机器人怎么都连不上，看起来还像代码坏了。
  * 所以说明书窗口、启动横幅、以及每次连接失败，都用同一份文案提醒。
@@ -89,6 +99,31 @@ function endpointLines(host: string, port: number): string[] {
     "     填错了我就一直连不上 —— 我会一直在那儿等，改好它自己就进来了。",
     "     （我连的是 " + host + ":" + port + "，想换端口就改 .env 里的 MC_SERVER_PORT）",
   ];
+}
+
+/**
+ * 大脑那一行。为什么值得单独占两行：BRAIN_ENABLED 不是 true 的时候，机器人
+ * 照样上线、照样跟着你、照样听 #指令，只是一句话都不说 —— 看起来完全像坏了。
+ * 实测就是这样踩的：默认关着，照文档配完 doctor 全绿，进游戏喊它却没反应。
+ */
+function brainLines(brain?: BrainStatus): string[] {
+  if (!brain) return [];
+  const cmd = (brain.cmd ?? "").trim();
+  if (!brain.enabled) {
+    return [
+      "   ★ 大脑：关着 —— 他只会执行上面的 #指令、跟着你走，不会跟你说话。",
+      "     想让他开口：.env 里写 BRAIN_ENABLED=true，BRAIN_CMD=bun apps/brain-deepseek/src/index.ts",
+      "",
+    ];
+  }
+  if (cmd.length === 0) {
+    return [
+      "   ★ 大脑：BRAIN_ENABLED 开着，但 BRAIN_CMD 是空的 —— 等于没开，他还是不说话。",
+      "     .env 里补上：BRAIN_CMD=bun apps/brain-deepseek/src/index.ts",
+      "",
+    ];
+  }
+  return ["   ★ 大脑：" + cmd + " —— 说人话他听得懂。", ""];
 }
 
 /** 「说人话也行」—— 横幅和说明书窗口共用同一份。 */
@@ -116,6 +151,7 @@ export function startupBanner(
   owner: string,
   commands: BannerCommand[],
   endpoint: Endpoint = {},
+  brain?: BrainStatus,
 ): string[] {
   return [
     "",
@@ -126,6 +162,7 @@ export function startupBanner(
     ...commands.flatMap(commandBlock),
     "",
     RULE,
+    ...brainLines(brain),
     ...plainTalkBlock(),
     "",
     ...opBlock(username),
@@ -147,6 +184,7 @@ export function cheatSheet(
   owner: string,
   commands: BannerCommand[],
   endpoint: Endpoint = {},
+  brain?: BrainStatus,
 ): string[] {
   return [
     "",
@@ -174,6 +212,7 @@ export function cheatSheet(
     ...commands.flatMap(commandBlock),
     "",
     RULE,
+    ...brainLines(brain),
     ...plainTalkBlock(),
     RULE,
     "",

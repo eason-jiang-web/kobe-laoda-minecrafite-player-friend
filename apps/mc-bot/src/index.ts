@@ -213,10 +213,14 @@ async function main() {
   // Minecraft. Plain console.log so it shows even at LOG_LEVEL=warn.
   // eslint-disable-next-line no-console
   console.log(
-    startupBanner(cfg.mc.username, cfg.mc.ownerUsername, COMMANDS, {
-      host: cfg.mc.host,
-      port: cfg.mc.port,
-    }).join("\n"),
+    startupBanner(
+      cfg.mc.username,
+      cfg.mc.ownerUsername,
+      COMMANDS,
+      { host: cfg.mc.host, port: cfg.mc.port },
+      // 大脑开没开必须打在终端最显眼的地方：关着的时候他不说话，看着像坏了
+      { enabled: cfg.brain.enabled, cmd: cfg.brain.cmd.join(" ") },
+    ).join("\n"),
   );
 
   // ── connection lifecycle + auto-reconnect ──

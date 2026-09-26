@@ -168,7 +168,31 @@ async function main(): Promise<void> {
     );
   }
 
-  // 7. 中文物品名（找不到不影响玩）
+  // 7. 大脑开没开 —— 关着的时候它一句话都不说，最容易看着像坏了
+  if (hasEnv) {
+    const brainOn = get("BRAIN_ENABLED") === "true";
+    const brainCmd = get("BRAIN_CMD").trim();
+    if (!brainOn) {
+      add({
+        ok: false,
+        label: "大脑关着（BRAIN_ENABLED 不是 true）—— 它会进游戏、跟着你、听 #指令，但不会跟你说话",
+        fix:
+          "想让它回话就在 .env 里写 BRAIN_ENABLED=true 和 " +
+          "BRAIN_CMD=bun apps/brain-deepseek/src/index.ts（.env.example 里默认就是这两行）",
+      });
+    } else if (brainCmd.length === 0) {
+      add({
+        ok: false,
+        fatal: true,
+        label: "BRAIN_ENABLED 开着，但 BRAIN_CMD 是空的 —— 等于没开",
+        fix: "在 .env 里补上：BRAIN_CMD=bun apps/brain-deepseek/src/index.ts",
+      });
+    } else {
+      add({ ok: true, label: "大脑开着（" + brainCmd + "）" });
+    }
+  }
+
+  // 8. 中文物品名（找不到不影响玩）
   const appData = process.env.APPDATA;
   const mcRoot = findMcRoot(
     [get("MC_GAME_DIR"), appData ? join(appData, ".minecraft") : ""].filter((p) => p.length > 0),
@@ -184,7 +208,7 @@ async function main(): Promise<void> {
         },
   );
 
-  // 8. 语音（可选）
+  // 9. 语音（可选）
   const voice = get("MC_VOICE") === "true";
   if (voice) {
     let pluginOk = true;

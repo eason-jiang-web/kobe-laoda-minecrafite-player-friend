@@ -101,7 +101,7 @@ cd <项目目录>
 bun install
 
 Copy-Item .env.example .env
-# 打开 .env，至少填这四项：
+# 打开 .env，至少填这四项（大脑默认就是开着的，不用动）：
 #   DEEPSEEK_API_KEY=sk-...
 #   MC_VERSION=1.20.6          ← 必须和你启动的版本一字不差
 #   MC_OWNER_USERNAME=你的游戏名
@@ -138,7 +138,9 @@ bun run doctor        # 自检：哪没配好它会直接说，并告诉你怎�
 | `MC_VOICE_HEAR` | 听不听你说话（识别） |
 | `MC_REPORT_ITEMS` | 攒够多少跟你报一声，如 `any_log:128,rare:10` |
 | `MC_GAME_DIR` | 你的游戏目录（读中文物品名 + 自动开 op 用；不填会自动找） |
-| `BRAIN_ENABLED` / `DEEPSEEK_API_KEY` | 大脑开关 / key |
+| `DEEPSEEK_API_KEY` | DeepSeek 的 key（大脑靠它思考） |
+| `BRAIN_ENABLED` | 大脑开关，**默认开着**。关掉的话它照样进游戏、听指令，但不会跟你说话 |
+| `BRAIN_CMD` | 大脑是什么，默认内置 DeepSeek；想换成别的 agent 就改这行 |
 
 完整说明见 `.env.example` 里的注释，以及 **[docs/PCL_DEEPSEEK_SETUP.md](./docs/PCL_DEEPSEEK_SETUP.md)**（中文逐步教程，含排查）。
 
@@ -191,6 +193,7 @@ bun run typecheck     # 类型检查
 
 | 现象 | 原因 / 怎么办 |
 |---|---|
+| **它进游戏了，但一句话都不说** | 大脑没开。`.env` 里要有 `BRAIN_ENABLED=true` 和 `BRAIN_CMD=bun apps/brain-deepseek/src/index.ts`（`.env.example` 默认就是这两行）。启动横幅和 `bun run doctor` 都会直接把这条点出来 |
 | `port 3001 is already in use` | 上一次的机器人还在跑。关掉那个窗口，或改 `.env` 里的 `MCP_PORT` 和 `ITTO_MCP_URL` |
 | 一直说"连不上 127.0.0.1:25565" | 世界没开「对局域网开放」，或者**端口没从随机值改成 25565**。它会一直等，改好自己就进来了 |
 | 它不说话（语音） | 客户端装 Simple Voice Chat 了吗、`MC_VOICE=true` 吗、游戏里按 `V` 选对麦克风了吗。终端里搜 `语音频道已连上` |

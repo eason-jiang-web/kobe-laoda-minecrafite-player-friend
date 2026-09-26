@@ -16,8 +16,14 @@ const owner = process.env.MC_OWNER_USERNAME?.trim() || "你";
 // 不会出现"文档写 25565、.env 改成别的"这种对不上。
 const host = process.env.MC_SERVER_HOST?.trim() || "127.0.0.1";
 const port = Number(process.env.MC_SERVER_PORT ?? 25565) || 25565;
+// 大脑开没开也一起打出来 —— 关着的时候机器人不说话，看着像坏了，
+// 而说明书窗口正是玩家最容易看到的地方，得在这儿就说清楚。
+const brain = {
+  enabled: process.env.BRAIN_ENABLED === "true",
+  cmd: process.env.BRAIN_CMD ?? "",
+};
 
-console.log(cheatSheet(username, owner, COMMANDS, { host, port }).join("\n"));
+console.log(cheatSheet(username, owner, COMMANDS, { host, port }, brain).join("\n"));
 // 这几句以前写在 指令说明.cmd 里 —— 但 cmd.exe 处理含中文的批处理会在字节边界错位
 // （实测：「牢大」这种字会把下一行 echo 切成命令去执行）。所以 .cmd 只留 ASCII，
 // 所有给人看的中文都从这里打出去。

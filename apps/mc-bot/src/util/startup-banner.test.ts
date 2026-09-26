@@ -108,3 +108,36 @@ describe("cheatSheet — 菜单里那个单独的说明窗口", () => {
     expect(sheet).toContain("我会一直在那儿等");
   });
 });
+
+describe("大脑状态 —— 它不说话的原因必须写在脸上", () => {
+  const CMD = "bun apps/brain-deepseek/src/index.ts";
+  const off = startupBanner("Laoda", "eason", COMMANDS, {}, { enabled: false }).join("\n");
+  const noCmd = startupBanner("Laoda", "eason", COMMANDS, {}, { enabled: true, cmd: "" }).join("\n");
+  const on = startupBanner("Laoda", "eason", COMMANDS, {}, { enabled: true, cmd: CMD }).join("\n");
+
+  test("关着的时候明说「不会跟你说话」，并把两行怎么改直接给出来", () => {
+    expect(off).toContain("大脑：关着");
+    expect(off).toContain("不会跟你说话");
+    expect(off).toContain("BRAIN_ENABLED=true");
+    expect(off).toContain("BRAIN_CMD=" + CMD);
+  });
+
+  test("开着但 BRAIN_CMD 空着也照样拦（半开等于没开）", () => {
+    expect(noCmd).toContain("BRAIN_CMD 是空的");
+    expect(noCmd).toContain("等于没开");
+  });
+
+  test("正常开着就说清楚现在是谁在说话", () => {
+    expect(on).toContain("brain-deepseek");
+    expect(on).not.toContain("大脑：关着");
+  });
+
+  test("不传大脑状态就一个字都不多打（老的调用点不受影响）", () => {
+    expect(startupBanner("Laoda", "eason", COMMANDS).join("\n")).not.toContain("★ 大脑：");
+  });
+
+  test("说明书窗口也说同一件事", () => {
+    const sheet = cheatSheet("Laoda", "eason", COMMANDS, {}, { enabled: false }).join("\n");
+    expect(sheet).toContain("大脑：关着");
+  });
+});
