@@ -23,6 +23,8 @@ export class FollowController {
   private lastGoalPos: Vec3 | null = null;
   /** When true (set by the skill executor), the SM stands down. */
   private suspended = false;
+  /** Free roam (#free): not following at all, however far he goes. */
+  private freeRoam = false;
 
   constructor(
     private bot: Bot,
@@ -35,10 +37,25 @@ export class FollowController {
     this.lastGoalPos = null;
     this.state = "IDLE";
     this.suspended = false;
+    this.freeRoam = false;
   }
 
   getState(): FollowState {
-    return this.suspended ? "TASK" : this.state;
+    if (this.suspended) return "TASK";
+    if (this.freeRoam) return "IDLE";
+    return this.state;
+  }
+
+  /** #free / #back. Free roam also drops any pathfinding we were doing. */
+  setFreeRoam(on: boolean): void {
+    this.freeRoam = on;
+    this.lastGoalPos = null;
+    this.state = "IDLE";
+    if (on) this.bot.pathfinder.setGoal(null);
+  }
+
+  isFreeRoam(): boolean {
+    return this.freeRoam;
   }
 
   suspend(): void {
@@ -52,7 +69,7 @@ export class FollowController {
 
   /** Called every fast-loop tick. Cheap; only re-paths when needed. */
   tick(): void {
-    if (this.suspended) return;
+    if (this.suspended || this.freeRoam) return;
 
     const player = this.bot.players[this.cfg.mc.ownerUsername]?.entity;
     if (!player) {

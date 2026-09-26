@@ -6,6 +6,8 @@ import { registerInventoryTools } from "./inventory.js";
 import { registerSocialTools } from "./social.js";
 import { registerPerceptionTools } from "./perception.js";
 import { registerCraftingTools } from "./crafting.js";
+import { registerProgressTools } from "./progress.js";
+import { registerWikiTools } from "./wiki.js";
 
 /**
  * Register every MCP tool against the live bot control surface.
@@ -19,4 +21,6 @@ export function registerTools(server: McpServer, control: BotControl): void {
   registerSocialTools(server, control);
   registerPerceptionTools(server, control);
   registerCraftingTools(server, control);
+  registerProgressTools(server, control);
+  registerWikiTools(server, control);
 }

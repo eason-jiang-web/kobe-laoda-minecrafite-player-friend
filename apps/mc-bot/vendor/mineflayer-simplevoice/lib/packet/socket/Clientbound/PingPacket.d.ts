@@ -1,0 +1,7 @@
+import dgram from "dgram";
+import { FriendlyByteBuf } from "../../../data/FriendlyByteBuf";
+import { ClientboundSocketPacket } from "../SocketPacket";
+export default class ClientboundPingPacket extends ClientboundSocketPacket<{}> {
+    constructor(socket: dgram.Socket);
+    deserialize(data: FriendlyByteBuf): {};
+}

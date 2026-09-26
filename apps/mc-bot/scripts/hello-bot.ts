@@ -12,13 +12,16 @@
  * free servers sleep when idle, so join it yourself first to wake it.
  */
 import mineflayer from "mineflayer";
+import { assertSupportedVersion } from "../src/bot/versions.js";
 
 const auth = (process.env.MC_AUTH ?? "offline") as "offline" | "microsoft";
+
+assertSupportedVersion(process.env.MC_VERSION ?? "1.20.6");
 
 const bot = mineflayer.createBot({
   host: process.env.MC_SERVER_HOST ?? "localhost",
   port: Number(process.env.MC_SERVER_PORT ?? 25565),
-  username: process.env.MC_BOT_USERNAME ?? "itto",
+  username: process.env.MC_BOT_USERNAME ?? "bot",
   auth,
   version: process.env.MC_VERSION ?? "1.20.6",
   // microsoft auth: print the device-code link instead of opening a browser

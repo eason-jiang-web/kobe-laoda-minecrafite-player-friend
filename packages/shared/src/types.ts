@@ -101,7 +101,22 @@ export interface GameState {
   nearbyHostiles: EntityInfo[];
   recentChat: ChatLine[];
   inventory: InventoryItem[];
+  /** 在线玩家（不含机器人自己）。物资目标按人数缩放，也让他知道今天几个人玩。 */
+  players?: string[];
+  /**
+   * 玩家用 #value <物品> <数字> 改过的上限（绝对总数，不再乘人数）。
+   * key 可以是需求组名（"iron"）或具体物品名（"raw_iron"）。
+   */
+  valueCaps?: Record<string, number>;
   followState: FollowState;
+  /** #free / #stay / #stop / #quiet 这类模式开关（大脑要知道，免得说错话）。 */
+  modes?: {
+    freeRoam: boolean;
+    pacifist: boolean;
+    holdPosition?: boolean;
+    muted?: boolean;
+    guide?: boolean;
+  };
   /** The goal itto is currently pursuing (set by the brain via set_goal), if any. */
   currentGoal: { id: string; label: string; status: GoalStatus; progress?: string } | null;
   /**
@@ -120,7 +135,18 @@ export type BotIntent =
   | { kind: "say"; text: string }
   | { kind: "skill"; name: string; args?: Record<string, unknown> }
   | { kind: "follow"; range?: number }
-  | { kind: "stop" };
+  | { kind: "stop" }
+  /**
+   * Gather N of an item. Unlike a one-shot skill, this goal is only "done" when
+   * the inventory REALLY holds N — the runner re-checks every tick and keeps
+   * going until it does (or gives up and says how far it got).
+   */
+  | { kind: "collect"; item: string; count: number }
+  /**
+   * Hand items to the player. "Done" means he actually picked them up (no
+   * dropped-item entities left at his feet), not merely that drop was called.
+   */
+  | { kind: "deliver"; items: Array<{ name: string; count: number }> };
 
 export type GoalStatus = "active" | "done" | "failed" | "cancelled";
 
@@ -135,6 +161,9 @@ export interface BotGoal {
   updatedAt: number;
   progress?: string;
   error?: string;
+  /** Scratch used by verified goals (collect rounds tried, when we dropped stuff). */
+  rounds?: number;
+  droppedAt?: number;
 }
 
 /** Result envelope returned by every MCP tool, kept uniform for Hermes. */

@@ -19,11 +19,17 @@ import type {
  * mcp-server depends on @itto/shared (this interface), never on the app.
  */
 export interface BotControl {
-  /** Pathfind to within `range` blocks of target. Sprint optional. */
-  moveTo(target: Vec3Lit, opts?: { range?: number; sprint?: boolean }): Promise<void>;
+  /**
+   * Pathfind to within `range` blocks of target. Sprint optional.
+   * `noTeleport` forces an actual walk even when an op /tp shortcut is available
+   * (used by "#here" — come to me, but don't pop in out of thin air).
+   */
+  moveTo(target: Vec3Lit, opts?: { range?: number; sprint?: boolean; noTeleport?: boolean }): Promise<void>;
 
   /** `/tp` style snap — only works if the bot is server op. Used as the >30 block fallback. */
   teleportTo(target: Vec3Lit): Promise<void>;
+  /** 瞬移到某个玩家身边（不填就是 owner）。看不见人也该过得去 —— 按名字让服务端找。 */
+  teleportToPlayer(name?: string): Promise<string>;
 
   /** Aim the bot's head at a point (for "look at player" idle + pointing). */
   lookAt(target: Vec3Lit): Promise<void>;
@@ -36,6 +42,14 @@ export interface BotControl {
 
   /** Send an in-game chat message (text channel, not Discord voice). */
   chat(message: string): Promise<void>;
+
+  /**
+   * Run a server command through the chat bar ("time set day" — the slash is
+   * optional). Only commands on the configured allow-list actually run, and the
+   * return value includes the server's own reply so the brain learns whether it
+   * worked (permission denied, unknown command, ...).
+   */
+  runServerCommand(command: string): Promise<string>;
 
   /** Latest compact world snapshot. Cheap — read from cached game state. */
   getState(): GameState;
@@ -56,6 +70,31 @@ export interface BotControl {
 
   /** Unit direction the owner is facing (from yaw/pitch). For scouting ahead. */
   playerHeading(player?: string): Vec3Lit | null;
+
+  /**
+   * Free roam (#free): the body isn't following the player and won't auto-/tp
+   * to him, however far he wanders.
+   */
+  isFreeRoam(): boolean;
+
+  /** Hold fire (#stop): attack() refuses until something re-arms it. */
+  isPacifist(): boolean;
+
+  /** Waiting in place (#stay): no following, no wandering off to play. */
+  isHoldPosition(): boolean;
+
+  /** Quiet (#quiet): he stops volunteering lines, but still answers you. */
+  isMuted(): boolean;
+
+  /** Guide mode (#guide mode): he walks you through the main quest. */
+  isGuide(): boolean;
+
+  /**
+   * Find nearby entities by name ("villager", "iron_golem", "item", "cow").
+   * Nearest first. This is how "is there a village over there?" gets answered
+   * without a screenshot: villagers are entities, not blocks.
+   */
+  findEntities(names: string[], maxDistance?: number): EntityInfo[];
 
   // ── Mid-level action primitives (path-aware; composed by skills) ──
 

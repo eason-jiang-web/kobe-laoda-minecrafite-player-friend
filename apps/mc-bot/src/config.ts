@@ -2,6 +2,7 @@
  * Typed config loaded from environment. Fails loud and early if something
  * required is missing — better than a cryptic Mineflayer error 10s in.
  */
+import { parseAllowedCommands } from "./server-commands.js";
 
 function req(name: string): string {
   const v = process.env[name];
@@ -22,6 +23,51 @@ export interface Config {
     username: string;
     auth: "offline" | "microsoft";
     ownerUsername: string;
+    /**
+     * Words that mean "the player is talking to me" (case-insensitive).
+     * Always includes the bot's own in-game name. Set with MC_WAKE_WORDS.
+     */
+    wakeWords: string[];
+    /**
+     * Reply to ANYTHING the owner types, not just lines that name the bot.
+     * A LAN world is a two-person conversation; waiting to be named is what
+     * makes a companion feel like a tool. MC_CHAT_REPLY_ALL.
+     */
+    chatReplyAll: boolean;
+    /**
+     * Server commands the bot may run through the chat bar. "*" = everything
+     * (dangerous: /fill and /stop live there). Parsed by server-commands.ts.
+     */
+    allowedCommands: string[] | "*";
+    /**
+     * 开机时自己给自己发一次 /op。玩家没权限，所以这条**注定被拒** ——
+     * 但值得发：万一你已经给过，这里就当确认；被拒时它在游戏里提示你一句，
+     * 省得你去翻终端。MC_SELF_OP（默认开）。
+     */
+    selfOp: boolean;
+    /**
+     * 你的 Minecraft 游戏目录（PCL 版本隔离时是 `...\.minecraft\versions\<版本>`）。
+     * 用途：读官方中文语言文件（让牢大眼里的物品是中文），以及「给牢大开权限.cmd」
+     * 找存档。不填就自动找。MC_GAME_DIR。
+     */
+    gameDir?: string;
+    /**
+     * 在游戏里用**语音**说话（Simple Voice Chat 模组）。
+     * 需要你的客户端装了这个模组；它说话的声音会从它在游戏里的位置传出来。
+     * MC_VOICE。
+     */
+    voice: {
+      enabled: boolean;
+      /** 音色名（Windows 自带可用：Microsoft Huihui Desktop / Microsoft Yaoyao）。 */
+      ttsVoice: string;
+      /** 语速 -10..10。 */
+      rate: number;
+      /**
+       * 听不听你说话（Windows 中文识别）。默认开。
+       * 关掉就只"说"不"听" —— 识别每句要 1~2 秒，嫌慢可以关。
+       */
+      hear: boolean;
+    };
   };
   mcp: {
     host: string;
@@ -34,6 +80,14 @@ export interface Config {
     teleportFallbackDistance: number;
     /** How often to wake the brain to reassess even with no event (0 = off). */
     heartbeatMs: number;
+    /** Inventory milestones worth reporting, e.g. "any_log:128,rare:10". */
+    reportItems: string;
+    /**
+     * Autoplay: when nothing is happening and no goal is running, wake the brain
+     * with "go find something useful to do" instead of a plain heartbeat, so it
+     * plays on its own. MC_AUTOPLAY.
+     */
+    autoplay: boolean;
   };
   brain: {
     /** When true, route slow-loop nudges to an external agent instead of logging. */
@@ -43,6 +97,8 @@ export interface Config {
     /** working directory for the agent spawn (optional). */
     dir?: string;
     cooldownMs: number;
+    /** Cooldown for priority nudges (someone is talking to you right now). */
+    chatCooldownMs: number;
   };
   reconnect: {
     /** Auto-rejoin when kicked/disconnected (Minehut sleeps + kicks idle bots). */
@@ -54,14 +110,37 @@ export interface Config {
 }
 
 export function loadConfig(): Config {
+  // Minecraft in-game names are ASCII only, so the character has both a name
+  // it goes by (the persona) and one the server accepts (this username). The
+  // wake words can be anything the player would actually type at it.
+  const botUsername = process.env.MC_BOT_USERNAME ?? "itto";
+  const wakeWords = [
+    ...new Set(
+      [botUsername, ...(process.env.MC_WAKE_WORDS ?? "itto,牢大,曼巴").split(",")]
+        .map((w) => w.trim())
+        .filter(Boolean),
+    ),
+  ];
+
   return {
     mc: {
       host: process.env.MC_SERVER_HOST ?? "localhost",
       port: num("MC_SERVER_PORT", 25565),
       version: process.env.MC_VERSION ?? "1.20.6",
-      username: process.env.MC_BOT_USERNAME ?? "itto",
+      username: botUsername,
       auth: (process.env.MC_AUTH as "offline" | "microsoft") ?? "offline",
       ownerUsername: req("MC_OWNER_USERNAME"),
+      wakeWords,
+      chatReplyAll: (process.env.MC_CHAT_REPLY_ALL ?? "false") === "true",
+      allowedCommands: parseAllowedCommands(process.env.MC_ALLOW_COMMANDS),
+      selfOp: (process.env.MC_SELF_OP ?? "true") === "true",
+      gameDir: process.env.MC_GAME_DIR?.trim() || undefined,
+      voice: {
+        enabled: process.env.MC_VOICE === "true",
+        ttsVoice: process.env.MC_VOICE_TTS?.trim() || "Microsoft Huihui Desktop",
+        rate: Number.parseInt(process.env.MC_VOICE_RATE ?? "0", 10) || 0,
+        hear: (process.env.MC_VOICE_HEAR ?? "true") === "true",
+      },
     },
     mcp: {
       host: process.env.MCP_HOST ?? "0.0.0.0",
@@ -73,12 +152,15 @@ export function loadConfig(): Config {
       followTargetRange: num("FOLLOW_TARGET_RANGE", 3),
       teleportFallbackDistance: num("TELEPORT_FALLBACK_DISTANCE", 30),
       heartbeatMs: num("HEARTBEAT_MS", 30000),
+      reportItems: process.env.MC_REPORT_ITEMS ?? "any_log:128,rare:10",
+      autoplay: process.env.MC_AUTOPLAY === "true",
     },
     brain: {
       enabled: process.env.BRAIN_ENABLED === "true",
       cmd: (process.env.BRAIN_CMD ?? "").split(" ").filter(Boolean),
       dir: process.env.BRAIN_DIR || undefined,
       cooldownMs: num("BRAIN_COOLDOWN_MS", 10000),
+      chatCooldownMs: num("BRAIN_CHAT_COOLDOWN_MS", 1500),
     },
     reconnect: {
       enabled: (process.env.RECONNECT_ENABLED ?? "true") !== "false",

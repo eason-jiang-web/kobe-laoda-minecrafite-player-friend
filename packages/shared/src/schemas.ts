@@ -18,6 +18,13 @@ export const MoveToInput = z.object({
   sprint: z.boolean().optional().describe("Sprint there (default false)"),
 });
 
+export const TeleportToPlayerInput = z.object({
+  player: z
+    .string()
+    .optional()
+    .describe("Whose side to appear next to (default: your owner, eason). Another player's name works too."),
+});
+
 export const MineBlockInput = z.object({
   pos: Vec3Schema.describe("Coordinate of the block to mine"),
 });
@@ -42,6 +49,14 @@ export const EquipInput = z.object({
 
 export const ChatInput = z.object({
   message: z.string().describe("Message to send in Minecraft chat"),
+});
+
+export const RunServerCommandInput = z.object({
+  command: z
+    .string()
+    .describe(
+      "Minecraft server command to run through the chat bar, slash optional. e.g. 'time set day', '/weather clear', 'give eason diamond 3'",
+    ),
 });
 
 export const RunSkillInput = z.object({
@@ -140,6 +155,17 @@ export const BotIntentSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("follow"), range: z.number().optional().describe("Follow distance in blocks") }),
   z.object({ kind: z.literal("stop") }),
+  z.object({
+    kind: z.literal("collect"),
+    item: z.string().describe("Item id to gather, e.g. 'oak_log', 'cobblestone', 'raw_iron'"),
+    count: z.number().int().positive().describe("How many you need before the task counts as done"),
+  }),
+  z.object({
+    kind: z.literal("deliver"),
+    items: z
+      .array(z.object({ name: z.string(), count: z.number().int().positive() }))
+      .describe("Items to hand to the player — must already be in your inventory"),
+  }),
 ]);
 
 export const SetGoalInput = z.object({
@@ -149,10 +175,34 @@ export const SetGoalInput = z.object({
 
 export type SetGoalInputT = z.infer<typeof SetGoalInput>;
 
-// ── Voice (jabby → spoken in the Discord call) ──
+// ── Memory: free-form notes ──
+// Cheap long-term memory for things that aren't places or chests: "eason is
+// saving for a castle", "we still owe the nether trip". The brain writes them;
+// they come back in itto://memory/world.
 
-export const SpeakInput = z.object({
-  text: z.string().describe("Short, casual, lowercase line to say OUT LOUD in the voice call (different from in-game chat)."),
+export const RememberNoteInput = z.object({
+  text: z.string().describe("Short free-form note worth remembering across sessions"),
 });
 
-export type SpeakInputT = z.infer<typeof SpeakInput>;
+export const WikiNotesInput = z.object({
+  topic: z
+    .string()
+    .optional()
+    .describe("Which studied topic to read back (e.g. 僵尸 / 刷怪塔). Omit to get the list of everything studied."),
+});
+
+export const WikiLookupInput = z.object({
+  query: z
+    .string()
+    .describe("What to look up on the Minecraft Wiki, e.g. 刷怪塔 / 僵尸 / 附魔台 / iron golem farm. Chinese or English."),
+  lang: z
+    .enum(["zh", "en"])
+    .optional()
+    .describe("Wiki language (default zh — same as how you talk to him). Use en when the Chinese page is thin."),
+});
+
+export const RecallNotesInput = z.object({
+  limit: z.number().int().positive().optional().describe("How many recent notes (default 10, max 50)"),
+});
+
+// （语音相关的东西已经删掉了：牢大只在游戏聊天里说话。）

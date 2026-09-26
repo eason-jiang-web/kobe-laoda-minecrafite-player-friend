@@ -10,7 +10,7 @@ const WEAPON_PRIORITY = [
   /^golden_sword$/, /^wooden_sword$/, /_axe$/,
 ];
 
-function pickWeapon(inv: InventoryItem[]): string | null {
+export function pickWeapon(inv: InventoryItem[]): string | null {
   for (const rx of WEAPON_PRIORITY) {
     const hit = inv.find((i) => rx.test(i.name));
     if (hit) return hit.name;
@@ -35,6 +35,8 @@ export const combatAssist: Skill = {
 
       let engaged = false;
       for (let i = 0; i < 120; i++) {
+        // #stop 一开就收手 —— 不然这个循环会一直往怪身上凑却打不出去
+        if (ctx.control.isPacifist()) return engaged ? "hold fire (#stop) — backing off" : "hold fire (#stop)";
         const player = ctx.control.getState().player;
         if (player?.distance != null && player.distance > 24) {
           return engaged ? "fell back to you" : "you walked off, standing down";

@@ -10,12 +10,22 @@ import type {
   NotableBlock,
   Vec3Lit,
 } from "@itto/shared";
+// 值导入（不是 type）：中文名 → id 的归一化，工具入参都要过这一道
+import { toItemId } from "@itto/shared";
 import type { Config } from "../config.js";
 import { extractGameState } from "../state/extract.js";
+import { systemSince } from "../state/system-log.js";
+import { classifyTpReply, isOpDenied } from "../util/op-hint.js";
+import { checkCommand } from "../server-commands.js";
 import { HOSTILE } from "../state/hostiles.js";
 import { logger } from "../util/logger.js";
 
 const log = logger("controller");
+
+/**
+ * Minecraft 聊天栏一行的硬上限。留 1 个字符给省略号，正好 256。
+ */
+const MC_CHAT_LIMIT = 256;
 
 const round = (n: number) => Math.round(n * 100) / 100;
 const toLit = (v: { x: number; y: number; z: number }): Vec3Lit => ({
@@ -38,6 +48,26 @@ const STONE_NAMES = new Set([
 export class BotController implements BotControl {
   /** Cache of friendly-name → block ids (the registry is static per session). */
   private blockIdCache = new Map<string, number[]>();
+  /**
+   * Whether the server lets us /tp. null = haven't tried yet. Once we learn it
+   * doesn't, we stop trying and just walk — no point spamming a command the
+   * server throws away (and no point pretending we arrived).
+   */
+  private canTeleport: boolean | null = null;
+  /** #free: no automatic /tp to the player, however far he goes. */
+  private freeRoam = false;
+  /** #stop: attack() refuses until something re-arms it. */
+  private pacifist = false;
+  /** True only for the duration of one attackDirect() swing. */
+  private directOrder = false;
+  /** Bumped by #stop so an in-flight #attack routine knows it was cancelled. */
+  private attackEpoch = 0;
+  /** #stay: wait right here — no following, no playing on his own. */
+  private holdPosition = false;
+  /** #quiet: stop volunteering lines (conversation and danger still get through). */
+  private muted = false;
+  /** #guide mode: act as a tour guide and nudge him along the main quest. */
+  private guide = false;
 
   constructor(
     private bot: Bot,
@@ -49,30 +79,172 @@ export class BotController implements BotControl {
    * reconnect. Keeps the same controller instance (already injected into the
    * MCP server) so the brain's session survives the body swapping out.
    */
+  setFreeRoam(on: boolean): void {
+    this.freeRoam = on;
+  }
+
+  isFreeRoam(): boolean {
+    return this.freeRoam;
+  }
+
+  setPacifist(on: boolean): void {
+    this.pacifist = on;
+  }
+
+  isPacifist(): boolean {
+    return this.pacifist;
+  }
+
+  setHoldPosition(on: boolean): void {
+    this.holdPosition = on;
+  }
+
+  isHoldPosition(): boolean {
+    return this.holdPosition;
+  }
+
+  setGuide(on: boolean): void {
+    this.guide = on;
+  }
+
+  isGuide(): boolean {
+    return this.guide;
+  }
+
+  setMuted(on: boolean): void {
+    this.muted = on;
+  }
+
+  isMuted(): boolean {
+    return this.muted;
+  }
+
+  /**
+   * An explicit "hit THIS one" order (#attack <name>). It is allowed even while
+   * holding fire — the player named a target, that's not autonomous fighting —
+   * and it does NOT lift the hold: #nonstop is still the only way to re-arm him.
+   */
+  async attackDirect(entityId: number): Promise<void> {
+    this.directOrder = true;
+    try {
+      await this.attack(entityId);
+    } finally {
+      this.directOrder = false;
+    }
+  }
+
+  /** #stop invalidates any #attack routine that's mid-swing. */
+  cancelAttackOrders(): void {
+    this.attackEpoch++;
+  }
+
+  /** An #attack routine remembers this and bails out if it changes. */
+  attackOrder(): number {
+    return this.attackEpoch;
+  }
+
   rebind(bot: Bot): void {
     this.bot = bot;
     this.blockIdCache.clear();
+    // A fresh connection is a fresh world session: the player may have re-opened
+    // the LAN world (and lost the op), so forget what we learned about /tp.
+    this.canTeleport = null;
   }
 
-  async moveTo(target: Vec3Lit, opts?: { range?: number; sprint?: boolean }): Promise<void> {
+  async moveTo(
+    target: Vec3Lit,
+    opts?: { range?: number; sprint?: boolean; noTeleport?: boolean },
+  ): Promise<void> {
     const range = opts?.range ?? 1;
     const here = this.bot.entity.position;
     const dist = here.distanceTo(new Vec3(target.x, target.y, target.z));
 
     // Long-haul fallback: teleport instead of pathing across the world.
-    if (dist > this.cfg.tuning.teleportFallbackDistance) {
-      log.debug(`dist ${dist.toFixed(1)} > fallback, teleporting`);
-      return this.teleportTo(target);
+    // Set TELEPORT_FALLBACK_DISTANCE=0 to never use it (no /op needed at all).
+    const tpRange = this.cfg.tuning.teleportFallbackDistance;
+    const mayTeleport = !opts?.noTeleport && !this.freeRoam;
+    if (mayTeleport && tpRange > 0 && dist > tpRange && this.canTeleport !== false) {
+      log.debug(`dist ${dist.toFixed(1)} > ${tpRange}, trying teleport`);
+      if (await this.tryTeleport(target)) return;
+
+      this.canTeleport = false;
+      log.warn(
+        "teleport didn't move us — the bot isn't op, so long trips will be walked instead. " +
+          "Run '/op " + this.bot.username + "' in game to make them instant, " +
+          "or set TELEPORT_FALLBACK_DISTANCE=0 to stop trying.",
+      );
     }
 
     const goal = new goals.GoalNear(target.x, target.y, target.z, range);
     await this.bot.pathfinder.goto(goal);
   }
 
-  async teleportTo(target: Vec3Lit): Promise<void> {
-    // Requires op. If the bot isn't op this is a no-op the server rejects;
-    // the slow loop should know whether teleport is available.
+  /**
+   * Fire /tp and then CHECK we actually moved. Without op the server quietly
+   * drops the command, and the old version treated that as success — the body
+   * believed it had arrived while standing completely still.
+   */
+  private async tryTeleport(target: Vec3Lit): Promise<boolean> {
+    const before = this.bot.entity.position.clone();
+
+    // 已经在目标点上了：没有"位移"可验，但这本来就该算成功 ——
+    // 少了这一条，"站在你旁边时喊它过来"会被误报成"没 op"（实测就是这么翻的车）。
+    if (before.distanceTo(new Vec3(target.x, target.y, target.z)) <= 1) return true;
+
     this.bot.chat(`/tp ${this.bot.username} ${target.x} ${target.y} ${target.z}`);
+    await new Promise((r) => setTimeout(r, 800));
+    return this.bot.entity.position.distanceTo(before) > 1;
+  }
+
+  /**
+   * 瞬移到某个玩家身边 —— "过来" 的实现。
+   *
+   * 位置看得见就直接跳到坐标（快，而且能验证真的动了）。
+   * **看不见时退回"按名字 tp"**：玩家在别的维度、或者离太远没发过来时，客户端拿不到
+   * 坐标，但服务端认识这个名字 —— `/tp @s eason` 照样成立，还能跨维度跟过去。
+   * （之前这种情况 #back 会直接说"看不见你在哪"，等于瞬移废了一半。）
+   */
+  async teleportToPlayer(name?: string): Promise<string> {
+    const target = (name ?? this.cfg.mc.ownerUsername).trim();
+    const entity = this.bot.players[target]?.entity;
+    if (entity) {
+      const p = entity.position;
+      await this.teleportTo({ x: round(p.x), y: round(p.y), z: round(p.z) });
+      return "坐标瞬移到 " + target + "（" + round(p.x) + ", " + round(p.y) + ", " + round(p.z) + "）";
+    }
+
+    // 看不见人也别放弃：让服务端按名字把人找出来。
+    const sentAt = Date.now();
+    this.bot.chat("/tp @s " + target);
+    await new Promise((r) => setTimeout(r, 900));
+    const reply = systemSince(sentAt)
+      .filter((l) => !l.startsWith("<"))
+      .join(" | ")
+      .trim();
+
+    const verdict = classifyTpReply(reply);
+    if (verdict === "denied") {
+      throw new Error("服务端不给瞬移权限（游戏里打一次 /op " + this.bot.username + " 就行）");
+    }
+    if (verdict === "notfound") {
+      throw new Error("服务端说找不到 " + target + "（人可能不在这个世界）");
+    }
+    if (verdict === "ok") return "按名字瞬移：" + reply;
+    // 看不懂的回话不冒充成功，原样报回去。
+    return reply ? "发了 /tp @s " + target + "，服务器回：" + reply : "发了 /tp @s " + target + "（服务端没吭声）";
+  }
+
+  async teleportTo(target: Vec3Lit): Promise<void> {
+    if (await this.tryTeleport(target)) {
+      // It worked: they may have opped us since the last attempt, so let the
+      // automatic long-haul fallback try again too.
+      this.canTeleport = true;
+      return;
+    }
+    this.canTeleport = false;
+    throw new Error(
+      `teleport didn't work — I need server op for this. Run "/op ${this.bot.username}" in game once.`,
+    );
   }
 
   async lookAt(target: Vec3Lit): Promise<void> {
@@ -93,25 +265,105 @@ export class BotController implements BotControl {
   }
 
   async dropItem(name: string, count?: number): Promise<void> {
-    const item = this.bot.inventory.items().find((i) => i.name === name);
+    const key = toItemId(name);
+    const item = this.bot.inventory.items().find((i) => i.name === key);
     if (!item) throw new Error(`no ${name} in inventory`);
     await this.bot.toss(item.type, null, count ?? item.count);
   }
 
   async equip(name: string, destination: "hand" | "head" | "torso" | "legs" | "feet" | "off-hand" = "hand"): Promise<void> {
-    const item = this.bot.inventory.items().find((i) => i.name === name);
+    const key = toItemId(name);
+    const item = this.bot.inventory.items().find((i) => i.name === key);
     if (!item) throw new Error(`no ${name} to equip`);
     await this.bot.equip(item, destination);
   }
 
   async attack(entityId: number): Promise<void> {
+    if (this.pacifist && !this.directOrder) {
+      throw new Error("停火中（#stop）—— 想动手就打 #nonstop，或者直接点名 #attack <名字>");
+    }
     const entity = this.bot.entities[entityId];
     if (!entity) throw new Error("entity gone");
     await this.bot.attack(entity);
   }
 
+  /**
+   * 说话的唯一出口。所有 chat 都走这里，所以在这里兜住 Minecraft 的两个硬限制：
+   *   1. 聊天栏一行最多 256 字符 —— 超了服务端直接丢包，表现是"它什么都没说"，
+   *      非常难查（#value 的清单、长报告都可能撞上）。
+   *   2. 换行会把一句话拆成多个包 —— 中文长句里混进 \n 就变成刷屏。
+   */
   async chat(message: string): Promise<void> {
-    this.bot.chat(message);
+    const clean = message.replace(/\s*\r?\n\s*/g, " ").trim();
+    if (clean.length === 0) return;
+
+    // 聊天不说话的地方："/" 开头是**服务器指令**，必须走 runServerCommand（那儿有白名单）。
+    // 在这里拦一道是最后一道闸 —— 不然任何绕过工具的调用都能 /fill 拆家。
+    if (clean.startsWith("/")) {
+      throw new Error("chat() 不出指令 —— 指令走 runServerCommand（有白名单）");
+    }
+    if (clean.length <= MC_CHAT_LIMIT) {
+      this.bot.chat(clean);
+      return;
+    }
+    const cut = clean.slice(0, MC_CHAT_LIMIT - 1) + "…";
+    log.warn("chat too long (" + clean.length + " chars), truncated: " + cut.slice(0, 48) + "…");
+    this.bot.chat(cut);
+  }
+
+  /**
+   * 开机自检权限：先按玩家要求自己发一次 /op，再用一条 level-2 指令问出**真实**权限。
+   *
+   * 为什么不拿 /op 的回执当结论：/op 要 level 3，而瞬移（/tp）只要 level 2。
+   * 局域网开了作弊的世界里，玩家常常已经有能用的权限、但 /op 照样被拒 ——
+   * 拿 /op 回执当结论就会**误报**（明明能瞬移，却在游戏里喊"给我 op"）。
+   *
+   * 所以：/op 只是"帮你顺手要一下"，真正的判据是 level-2 那条指令的回复。
+   */
+  async probePermissions(): Promise<{
+    canTeleport: boolean;
+    /** level-2 指令的回复（判定依据）。 */
+    reply: string;
+    /** /op 自己的回执（只用来写日志）。 */
+    opReply: string;
+  }> {
+    const readReplies = async (since: number): Promise<string> => {
+      await new Promise((r) => setTimeout(r, 900));
+      return systemSince(since)
+        .filter((l) => !l.startsWith("<"))
+        .join(" | ")
+        .trim();
+    };
+
+    const opSentAt = Date.now();
+    this.bot.chat("/op " + this.bot.username);
+    const opReply = await readReplies(opSentAt);
+
+    // /time query 要 level 2 —— 正好和 /tp 同档，答上来就说明瞬移能用。
+    const probeSentAt = Date.now();
+    this.bot.chat("/time query daytime");
+    const reply = await readReplies(probeSentAt);
+
+    return { canTeleport: reply.length > 0 && !isOpDenied(reply), reply, opReply };
+  }
+
+  /**
+   * Run a server command via the chat bar. Two guards: the allow-list decides
+   * WHAT may run (see server-commands.ts), and we read the server's reply back
+   * so the brain isn't firing blind.
+   */
+  async runServerCommand(command: string): Promise<string> {
+    const verdict = checkCommand(command, this.cfg.mc.allowedCommands);
+    if (!verdict.ok) throw new Error(verdict.reason);
+
+    const sentAt = Date.now();
+    this.bot.chat("/" + verdict.command);
+    await new Promise((r) => setTimeout(r, 600));
+
+    const feedback = systemSince(sentAt).filter((l) => !l.startsWith("<"));
+    return feedback.length > 0
+      ? `跑了 /${verdict.command}；服务器回：${feedback.join(" | ")}`
+      : `跑了 /${verdict.command}（服务器没吭声，一般就是成了）`;
   }
 
   getState(): GameState {
@@ -312,6 +564,16 @@ export class BotController implements BotControl {
     return { id: e.id, name: e.name!, pos: toLit(e.position), distance: round(here.distanceTo(e.position)) };
   }
 
+  /** Find nearby entities by name, nearest first. Used by explore_for (villagers). */
+  findEntities(names: string[], maxDistance = 48): EntityInfo[] {
+    const want = new Set(names.map((n) => n.toLowerCase()));
+    const here = this.bot.entity.position;
+    return Object.values(this.bot.entities)
+      .filter((e) => !!e.name && want.has(e.name.toLowerCase()) && here.distanceTo(e.position) <= maxDistance)
+      .map((e) => ({ id: e.id, name: e.name!, pos: toLit(e.position), distance: round(here.distanceTo(e.position)) }))
+      .sort((a, b) => a.distance - b.distance);
+  }
+
   // ── Containers ───────────────────────────────────────────────────────────
 
   async readContainer(pos: Vec3Lit): Promise<Array<{ item: string; count: number }>> {
@@ -356,9 +618,12 @@ export class BotController implements BotControl {
 
   // ── Name resolution ──────────────────────────────────────────────────────
 
-  /** Map a friendly block name or group alias to concrete block ids. */
+  /**
+   * Map a friendly block name or group alias to concrete block ids.
+   * 中文名也认（「橡木原木」→ oak_log），组别名（any_log / any_ore）照旧。
+   */
   private resolveBlockIds(name: string): number[] {
-    const key = name.toLowerCase();
+    const key = toItemId(name).toLowerCase();
     const cached = this.blockIdCache.get(key);
     if (cached) return cached;
 
@@ -392,8 +657,16 @@ export class BotController implements BotControl {
     return ids;
   }
 
+  /**
+   * 名字 → 物品 id。
+   *
+   * 这里过一道中文转换：模型眼里的背包**全是中文**
+   * （橡木原木 / 粗铁 / 下界合金锭），它调工具时自然说中文。
+   * 中文查不到就当 id 原样试，让上层去报"没有这个东西"。
+   */
   private resolveItemId(name: string): number | null {
-    const it = this.bot.registry.itemsByName[name];
+    const key = toItemId(name);
+    const it = this.bot.registry.itemsByName[key];
     return it ? it.id : null;
   }
 }

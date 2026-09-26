@@ -1,5 +1,10 @@
 # Hermes setup
 
+> ⚠️ **上游历史设计文档**：这份写的是项目还在 Hermes + Discord 那套时的样子，
+> 配置项和文件名已经和现在的实现不一致了。当前用法看 [README](../README.md) 和
+> [PCL_DEEPSEEK_SETUP.md](./PCL_DEEPSEEK_SETUP.md)。架构思路（快慢双循环、MCP 分层）仍然成立。
+
+
 Hermes (Nous Research) is itto's brain. It runs **outside** this repo, owns the
 Claude calls and the Discord voice channel, and connects to our MCP server to
 get hands + senses in the Minecraft world.
@@ -45,7 +50,7 @@ hermes platform discord enable
 ```
 
 If Hermes' plugin can't do voice receive + TTS well, fall back to
-`packages/discord-bridge` (DIY path — see its README).
+`packages/discord-bridge` (DIY path) — **已删除**：这个仓库现在不带任何语音模块。
 
 ## 5. The nudge channel (TODO)
 

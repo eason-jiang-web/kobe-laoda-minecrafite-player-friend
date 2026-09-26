@@ -8,6 +8,7 @@ import { collectDrops } from "./collect-drops.js";
 import { combatAssist } from "./combat-assist.js";
 import { fetchItem } from "./fetch-item.js";
 import { scoutAhead } from "./scout-ahead.js";
+import { exploreFor } from "./explore-for.js";
 import { buildHelper } from "./build-helper.js";
 import { inventoryReport } from "./inventory-report.js";
 import { logger } from "../util/logger.js";
@@ -24,6 +25,7 @@ export const SKILLS: Skill[] = [
   combatAssist,
   fetchItem,
   scoutAhead,
+  exploreFor,
   buildHelper,
   inventoryReport,
 ];

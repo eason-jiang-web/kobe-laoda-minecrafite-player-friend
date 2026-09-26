@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { DropItemInput, EquipInput, type BotControl } from "@itto/shared";
+import { DropItemInput, EquipInput, itemNameZh, type BotControl } from "@itto/shared";
 import { ok, fail } from "./_util.js";
 
 export function registerInventoryTools(server: McpServer, control: BotControl): void {
@@ -37,7 +37,11 @@ export function registerInventoryTools(server: McpServer, control: BotControl): 
     {},
     async () => {
       const inv = control.getState().inventory;
-      return ok(inv.length ? inv.map((i) => `${i.name} x${i.count}`).join(", ") : "empty", inv);
+      // 中文名给模型看，原始 id 放进 structuredContent（工具链另有用途）
+      const text = inv.length
+        ? inv.map((i) => `${itemNameZh(i.name)} x${i.count}`).join(", ")
+        : "empty";
+      return ok(text, inv);
     },
   );
 }

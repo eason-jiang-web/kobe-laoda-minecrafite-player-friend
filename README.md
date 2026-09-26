@@ -1,171 +1,149 @@
-# itto
+# 牢大 · Minecraft 陪玩 AI
 
-> an ai buddy that joins your minecraft world, follows you around, helps out, and hangs in your discord call. :3
+> 一个会**跟着你玩**的 AI 搭子：进你的世界、跟着你、帮你打怪挖矿、记住你的基地，
+> 用中文跟你聊天 —— 装好语音模组后还能**在游戏里开口说话**。
 
-You log in, itto spawns next to you, joins your voice call, and you just play
-together. It talks, it helps, it learns your playstyle over sessions. Not a
-coach. Not a tutorial bot. A duo partner.
+不是攻略助手，不是教程机器人。是那个你挖矿时在旁边絮叨、你被打时冲上去、你死了帮你捡东西的兄弟。
+人设是「抽象战神」，招牌台词：**What can I say? Mamba out!**
 
-Full project spec: **[docs/CONTEXT.md](./docs/CONTEXT.md)**. Build order and
-where to start: **[docs/ROADMAP.md](./docs/ROADMAP.md)**. Who runs what:
-**[docs/RUNBOOK.md](./docs/RUNBOOK.md)**. Architecture map:
-**[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)**.
+---
 
-## How it's built
+## 它现在会做什么
 
-itto is split into a body that lives in the game and a brain that thinks about
-it from outside, connected over the [Model Context Protocol](https://modelcontextprotocol.io).
-
-| Piece | What it is |
+| | |
 |---|---|
-| **Hermes** (Nous Research) | The brain. Runs Claude plus Discord voice. Lives **outside this repo** and connects over MCP. It owns the model; the bot never calls Claude directly. |
-| **`apps/mc-bot`** | The body. A [Mineflayer](https://github.com/PrismarineJS/mineflayer) bot with a 15Hz fast loop (follow and safety) and a roughly 4 second slow loop (decide when to react). |
-| **`packages/mcp-server`** | The nervous system. Exposes the bot's actions as MCP tools and its world state as MCP resources, so the external brain can perceive and act. |
-| **`packages/shared`** | Types, zod schemas, the `BotControl` interface, and the system prompt that gives itto its personality. |
-| **`apps/web`** | Landing page. |
+| **跟着你** | 15Hz 跟随 + 脱队自动抄近路（有 op 就瞬移，没有就走过去） |
+| **听你说话** | 游戏聊天栏说什么都接（不用喊名字），也能听懂「去挖点铁」「跟着我」「给我 32 个木头」 |
+| **真的去做** | 砍树、挖矿脉、探路、找村庄、打怪、取东西、丢东西给你 —— 多步任务在后台跑，做完回来汇报 |
+| **会看进度** | 知道主线走到第几步、这一步该干嘛；还会算**现在材料够盖什么**（农场/储物间/刷怪塔/传送门/附魔台/铁傀儡农场…），缺料会列清单 |
+| **自己在游戏里说话** | Windows 中文 TTS，声音**从它在游戏里的位置传出来**（有距离感，像旁边站着个人） |
+| **也能听你说话** | 你在语音频道说话 → 中文识别 → 当成你打的字进大脑（约 0.5 秒） |
+| **盯着你的动作** | 你被打/死了优先反应；你捡到钻石、完成进度、丢东西给它、睡下、上下线它都知道 |
+| **自修过 wiki** | 跑一次 `bun run study:wiki`，它读 57 个中文 Minecraft Wiki 条目、自己蒸馏成要点常驻记忆；细节随时用 `wiki_notes` 翻原文 |
+| **物品名是中文** | 从你本机 Minecraft 的语言文件读（橡木原木 / 粗铁 / 深层铁矿石），和你在屏幕上看到的逐字一致 |
+| **硬指令** | `#back` 瞬移到你身边、`#free` 自由活动、`#stop` 停火、`#attack 僵尸`、`#value 铁 400` 改物资上限、`#guide` 看进度… 不走大脑、瞬间生效、不花 token |
+| **被调教** | `#good` / `#bad` 给刚才那轮打分，写进 `data/training/` 训练日志 |
 
-## The two loops
+---
 
-The core design idea is that reflexes and reasoning run on different clocks.
+## 五分钟跑起来
 
-**Fast loop, 15Hz, no LLM.** Pure code. Every tick it runs safety reflexes
-(get out of lava, eat when food is low, flee a creeper) and advances a follow
-state machine, then pushes movement to Mineflayer. This is what keeps itto
-alive and next to you, and it never waits on a network call. The LLM is never
-in the hot path of "am I standing in lava."
+**需要什么**：Windows、[Bun](https://bun.sh)、一个 Minecraft Java 版世界（原版即可，1.7~1.21 里 mineflayer 认识的版本）、
+一个 [DeepSeek API key](https://platform.deepseek.com)（很便宜，一天几分钱）。
 
-**Slow loop, roughly every 4 seconds or on an event.** It snapshots the game
-into a compact `GameState` (position, inventory, nearby mobs, your location,
-chat, health, time of day, about 1 to 2 KB of structured json, no screenshots),
-runs cheap trigger predicates, and if something notable fired (you said
-"itto", a hostile appeared, health dropped, inventory filled) it nudges the
-brain with the reason and the state. Meanwhile a goal runner ticks through any
-multi-step skill the brain has queued.
-
-Because state comes straight from Mineflayer's in-memory model, perception is
-basically free and token-cheap. Vision (occasional vibe-check screenshots) is
-designed for but not yet wired in, on purpose: structured state is enough 95%
-of the time.
-
-## What itto can do
-
-The brain drives the bot through MCP tools registered in
-`packages/mcp-server/src/tools/`. Every tool returns an `{ ok, message }`
-envelope.
-
-| Tool | What it does |
-|---|---|
-| `move_to`, `look_at`, `stop` | pathfind to a coordinate, aim, cancel movement |
-| `mine_block`, `place_block`, `dig_at`, `mine_many` | break and place blocks |
-| `equip`, `drop_item`, `craft_item` | inventory and crafting (finds a nearby table when needed) |
-| `find_blocks`, `nearby_notable`, `look_for_player` | perception queries (supports aliases like `any_ore`, `any_log`) |
-| `chat` | send in-game text (voice goes through Hermes and Discord) |
-| `set_goal`, `cancel_goal` | queue or stop a multi-step goal |
-| `run_skill` | run a named skill |
-
-Skills are the higher-level behaviors, all dispatched through a single
-`runSkillByName()` path in `apps/mc-bot/src/skills/`:
-
-| Skill | Behavior |
-|---|---|
-| `follow_player` | resume following at a target range (default 3 blocks) |
-| `assist_mining` / `mine_vein` | find an ore vein via connected-component detection, clear it, sweep up drops |
-| `combat_assist` | equip the best weapon, engage the nearest threat to you, disengage when it's clear |
-| `scout_ahead` | path out in your heading, scan for notable blocks and mobs, come back |
-| `build_helper` | place blocks from a `{ placements: [{pos, item}] }` spec, report any shortfall |
-| `chop_tree` | harvest logs |
-| `fetch_item` | retrieve a known item from a known chest (memory-backed) |
-| `collect_drops`, `inventory_report` | pick up nearby drops, summarize what's carried |
-
-The follow behavior is a state machine (IDLE, DRIFT, CATCHUP, TASK) with
-hysteresis so it doesn't jitter, predictive pathing to where you're heading
-rather than where you were, personal-space backoff, and a teleport fallback for
-gaps bigger than 30 blocks. World memory (waypoints, a chest index, notes)
-persists in SQLite via `bun:sqlite` and survives restarts and reconnects.
-
-## Layout
-
-```
-itto/
-├── apps/
-│   ├── mc-bot/        # Mineflayer bot: fast-loop, slow-loop, skills, state, bot/
-│   └── web/           # landing page (owned separately, not part of the bot build)
-├── packages/
-│   ├── mcp-server/    # MCP server (tools + resources the external brain drives)
-│   ├── shared/        # types, zod schemas, prompts, the BotControl interface
-│   └── discord-bridge/# optional DIY voice, for later
-├── infra/             # docker-compose (local MC server), deploy/
-├── docs/              # CONTEXT.md (spec), ROADMAP.md, ARCHITECTURE.md, HERMES_SETUP.md
-└── scripts/           # dev.sh, seed-skills/ (Hermes markdown templates)
-```
-
-## Quick start
-
-Runs on [Bun](https://bun.sh). Bun executes the TypeScript directly, no Node or
-tsx in the loop.
-
-```bash
-# 0. tooling
-curl -fsSL https://bun.sh/install | bash   # if you don't have bun
-
-# 1. install
+```powershell
+git clone <这个仓库的地址>
+cd <项目目录>
 bun install
 
-# 2. config
-cp .env.example .env
-#   fill in at least MC_OWNER_USERNAME (your MC username, the player itto follows)
+Copy-Item .env.example .env
+# 打开 .env，至少填这四项：
+#   DEEPSEEK_API_KEY=sk-...
+#   MC_VERSION=1.20.6          ← 必须和你启动的版本一字不差
+#   MC_OWNER_USERNAME=你的游戏名
+#   MC_BOT_USERNAME=Laoda      ← 机器人自己的名字（ASCII，3-16 位）
 
-# 3. local minecraft + the bot (one command)
-./scripts/dev.sh
-#   or manually:
-#   bun run mc:up     # docker paper server on :25565
-#   bun run bot       # bot + MCP server on :3001
-
-# 4. wire up the brain (separate process, see docs/HERMES_SETUP.md)
-hermes mcp add itto http://localhost:3001/mcp
-hermes platform discord enable
+bun run doctor        # 自检：哪没配好它会直接说，并告诉你怎么改
 ```
 
-Then hop in the MC world and the Discord call and play.
+然后：
 
-Key environment variables (full list in `.env.example`): `MC_SERVER_HOST` /
-`MC_SERVER_PORT` / `MC_VERSION` (default 1.20.6) for the server, `MC_AUTH`
-(`offline` or `microsoft`), `MC_OWNER_USERNAME` (required), and `MCP_PORT`
-(default 3001) for the MCP endpoint.
+1. 进游戏 → **Esc → 对局域网开放** → **端口填 25565**（游戏默认给的是随机的，一定要改）→ 允许作弊**开**
+2. `bun run bot`（或者双击仓库里的 `牢大.cmd` / 桌面快捷方式，菜单按 `1`）
 
-## Deploy the landing page on Vercel
+启动后终端会打出**全部指令和用法**，游戏里它会自己进来、跟你打招呼。
 
-The landing page lives in `apps/web`, so create the Vercel project with:
+> **想要它在游戏里说话**：给你的客户端装 **Fabric + [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat)**，
+> 然后在 `.env` 里设 `MC_VOICE=true`。局域网世界 = 你客户端就是服务端，装一次两边都有。
+> 装完按 `V` 选麦克风，它就能听见你、也能开口回你。
 
-| Setting | Value |
+---
+
+## 常用配置（`.env` 速查）
+
+| 键 | 作用 |
 |---|---|
-| **Root Directory** | `apps/web` |
-| **Framework Preset** | `Next.js` |
-| **Install Command** | `bun install` |
-| **Build Command** | `bun run build` |
-| **Output Directory** | leave blank, Vercel default |
+| `MC_SERVER_HOST` / `MC_SERVER_PORT` | 连哪个世界。默认 `127.0.0.1:25565`（局域网世界）。**换成别人的服务器地址也能连** |
+| `MC_AUTH` | `offline`（离线/局域网）或 `microsoft`（正版服 —— 第一次启动会打印设备码登录链接） |
+| `MC_VERSION` | 世界版本，必须一致 |
+| `MC_OWNER_USERNAME` | 它跟着谁、听谁的（硬指令只有这个人能触发） |
+| `MC_WAKE_WORDS` | 哪些词算「在叫我」 |
+| `MC_AUTOPLAY` | `true`＝没人理它时自己排活干（挖矿/探路/盖东西） |
+| `MC_CHAT_REPLY_ALL` | `true`＝你说什么它都回，不用喊名字 |
+| `MC_VOICE` / `MC_VOICE_TTS` | 语音开关 / 音色（如 `Microsoft Huihui Desktop`） |
+| `MC_VOICE_HEAR` | 听不听你说话（识别） |
+| `MC_REPORT_ITEMS` | 攒够多少跟你报一声，如 `any_log:128,rare:10` |
+| `MC_GAME_DIR` | 你的游戏目录（读中文物品名 + 自动开 op 用；不填会自动找） |
+| `BRAIN_ENABLED` / `DEEPSEEK_API_KEY` | 大脑开关 / key |
 
-Set this environment variable in Vercel:
+完整说明见 `.env.example` 里的注释，以及 **[docs/PCL_DEEPSEEK_SETUP.md](./docs/PCL_DEEPSEEK_SETUP.md)**（中文逐步教程，含排查）。
 
-```bash
-NEXT_PUBLIC_SITE_URL=https://itto.stephenhung.me
+---
+
+## 常用命令
+
+```powershell
+bun run doctor        # 上手自检（配完先跑这个）
+bun run bot           # 启动机器人（--watch，改代码自动重启）
+bun run study:wiki    # 让它自修一遍 Minecraft Wiki（增量，可反复跑）
+bun test              # 全部测试（283 个）
+bun run typecheck     # 类型检查
 ```
 
-That URL is used for canonical metadata, `robots.txt`, `sitemap.xml`, and JSON-LD.
-Change it if the production domain is different.
+游戏里（只有 `MC_OWNER_USERNAME` 打得动）：
 
-## Status
+```
+#back     解除自由活动 + 立刻到我身边     #free     自由活动（不跟、不传送）
+#stop     停火（直到 #nonstop）          #attack 僵尸 / #attack eason  点名去打
+#stay     原地待命                       #here     走过来（不传送）
+#quiet    闭嘴模式（#talk 解除）         #cancel   取消当前任务
+#value    看物资评估 + 还缺什么           #value 铁 400   把铁的上限改成 400
+#guide    看主线进度 + 现在材料够盖什么    #guide mode     开工向导
+#good / #bad   给刚才那轮打分（写进训练日志）
+```
 
-Early scaffold. The structure, both loops, the control surface, the MCP tools,
-and the seed skills are wired and working. Follow, mining, combat, building,
-pathfinding, and crafting are implemented; the deeper pieces (full session
-memory, vibe-check vision, the Hermes nudge channel) are marked `TODO`. See
-`CONTEXT.md` for what's still open.
+---
 
-## Don'ts (from CONTEXT.md)
+## 它是怎么搭的
 
-- Don't put LLM calls in the fast loop.
-- Don't use screenshots when Mineflayer's structured state suffices.
-- Don't fork Hermes. Depend on it via MCP.
-- Don't make the bot proactively chatty. It mostly listens.
-- Don't pathfind long routes (over 30 blocks). Teleport instead.
+**身体在游戏里，脑子在外面，中间走 MCP。**
+
+| 部分 | 是什么 |
+|---|---|
+| `apps/mc-bot` | 身体：[Mineflayer](https://github.com/PrismarineJS/mineflayer) 机器人。**15Hz 快循环**（跟随、闪避、吃东西，纯代码不调模型）+ **约 4 秒慢循环**（判断"有没有值得反应的事"，有就叫醒大脑） |
+| `apps/brain-deepseek` | 脑子：DeepSeek（或任何 OpenAI 兼容接口）。每次唤醒是一次带工具的对话，能读世界状态、下指令、写记忆 |
+| `packages/mcp-server` | 神经：把身体的能力暴露成 MCP 工具、把世界状态暴露成 MCP 资源 |
+| `packages/shared` | 类型、schema、人设提示词、进度/工程评估、价值评估、中文物品名 |
+| `apps/web` | 落地页（可选，跟机器人无关） |
+
+设计上就一条原则：**"我正在被岩浆烧"这种反射绝不能排在大模型后面**。所以快循环永不等待网络，慢循环才有模型。
+
+想读懂代码，按这个顺序看：`apps/mc-bot/src/index.ts`（接线）→ `slow-loop/`（什么时候叫醒脑子）
+→ `chat-commands.ts`（硬指令）→ `apps/brain-deepseek/src/index.ts`（脑子那一轮）。
+
+---
+
+## 常见问题
+
+| 现象 | 原因 / 怎么办 |
+|---|---|
+| `port 3001 is already in use` | 上一次的机器人还在跑。关掉那个窗口，或改 `.env` 里的 `MCP_PORT` 和 `ITTO_MCP_URL` |
+| 一直说"连不上 127.0.0.1:25565" | 世界没开「对局域网开放」，或者**端口没从随机值改成 25565**。它会一直等，改好自己就进来了 |
+| 它不说话（语音） | 客户端装 Simple Voice Chat 了吗、`MC_VOICE=true` 吗、游戏里按 `V` 选对麦克风了吗。终端里搜 `语音频道已连上` |
+| 它听不到我说话 | 同上，加上：别超过 32 格（默认语音距离）。终端里应该有 `听到 eason 说了 X 秒` |
+| `#back` 说"传不过去" | 没有 op。游戏里打一次 `/op <机器人名>`，或者关掉世界双击 `给牢大开权限.cmd` |
+| 版本报错 `is not a Minecraft version mineflayer can speak` | 换成它提示的那个版本，或改 `MC_VERSION` 跟你世界一致 |
+| 想让它闭嘴/省钱 | `HEARTBEAT_MS=0`、`MC_AUTOPLAY=false`、`MC_CHAT_REPLY_ALL=false` |
+
+更细的排查（含语音、op、皮肤）见 **[docs/PCL_DEEPSEEK_SETUP.md](./docs/PCL_DEEPSEEK_SETUP.md)** 和 **[docs/SKIN_AND_MENU.md](./docs/SKIN_AND_MENU.md)**。
+
+---
+
+## 来源与说明
+
+- 本项目基于 **[silaswu4/itto](https://github.com/silaswu4/itto)** 改造：原来的骨架（快慢双循环 + MCP 分层）保留，
+  脑子换成了内置的 DeepSeek，人设、中文、语音、进度/工程评估、自修 wiki、中文物品名、硬指令这些都是后加的。
+- 上游仓库**没有 LICENSE 文件**。如果你要公开分发，请先确认上游的授权，或者只自己用/私有仓库。
+- 它读的 Minecraft Wiki 内容来自 [zh.minecraft.wiki](https://zh.minecraft.wiki)（CC BY-NC-SA），
+  自修笔记默认写在 `data/` 下（**不会被提交**），请勿把大段 wiki 原文再分发。
+- `.env` 和 `data/` 都在 `.gitignore` 里 —— 你的 key、世界记忆、训练日志不会被推上去。

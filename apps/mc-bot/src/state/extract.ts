@@ -85,6 +85,8 @@ export function extractGameState(bot: Bot, ownerUsername: string): GameState {
     nearbyHostiles: hostiles,
     recentChat: [...recentChat],
     inventory: bot.inventory.items().map((i) => ({ name: i.name, count: i.count })),
+    // 在线的人（不含自己）。物资目标要按人数缩放，所以这个必须有。
+    players: Object.keys(bot.players).filter((u) => u !== bot.username),
     followState: "IDLE", // overwritten by the fast loop's follow SM each tick
     currentGoal: null, // stamped by the goal runner each tick (see index.ts)
     lastGoal: null, // stamped by the goal runner each tick (see index.ts)

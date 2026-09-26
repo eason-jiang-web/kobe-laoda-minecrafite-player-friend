@@ -11,7 +11,7 @@ import type { GoalRunner } from "./goal-runner.js";
 export function registerGoalTools(server: McpServer, runner: GoalRunner): void {
   server.tool(
     "set_goal",
-    "Set what itto should pursue right now (replaces the current goal). Use this for multi-step work like 'chop a tree' or 'fetch iron' — the body pursues it and pings you when it's done.",
+    "Set what you should pursue right now (replaces the current goal). Use this for multi-step work like 'chop a tree' or 'fetch iron' — the body pursues it and pings you when it's done.",
     SetGoalInput.shape,
     async ({ intent, label }) => {
       const goal = runner.setGoal(intent, label);
@@ -21,7 +21,7 @@ export function registerGoalTools(server: McpServer, runner: GoalRunner): void {
 
   server.tool(
     "get_goal",
-    "Check what itto is currently working on.",
+    "Check what you are currently working on.",
     {},
     async () => {
       const goal = runner.currentGoal();
@@ -32,7 +32,7 @@ export function registerGoalTools(server: McpServer, runner: GoalRunner): void {
 
   server.tool(
     "cancel_goal",
-    "Stop whatever itto is currently doing and clear the goal.",
+    "Stop whatever you are currently doing and clear the goal.",
     {},
     async () => {
       runner.cancel();

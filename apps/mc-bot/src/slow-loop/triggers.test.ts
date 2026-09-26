@@ -1,6 +1,12 @@
 import { test, expect } from "bun:test";
 import type { GameState } from "@itto/shared";
-import { TRIGGERS } from "./triggers.js";
+import { createTriggers } from "./triggers.js";
+
+// The character is 牢大 / Laoda; the wake words are what the player types.
+const TRIGGERS = createTriggers({
+  botUsername: "Laoda",
+  wakeWords: ["Laoda", "牢大", "曼巴", "itto"],
+});
 
 function makeState(over: Partial<GameState> = {}): GameState {
   return {
@@ -15,7 +21,7 @@ function makeState(over: Partial<GameState> = {}): GameState {
       onGround: true,
       dimension: "overworld",
     },
-    player: { username: "matt", pos: { x: 0, y: 64, z: 0 }, distance: 2, online: true },
+    player: { username: "eason", pos: { x: 0, y: 64, z: 0 }, distance: 2, online: true },
     nearbyHostiles: [],
     recentChat: [],
     inventory: [],
@@ -28,13 +34,57 @@ function makeState(over: Partial<GameState> = {}): GameState {
 const fire = (name: string, s: GameState, prev: GameState | null) =>
   TRIGGERS.find((t) => t.name === name)!.check(s, prev);
 
-test("player_addressed_bot fires when itto is named", () => {
-  const s = makeState({ recentChat: [{ username: "matt", message: "yo itto come here", at: Date.now() }] });
-  expect(fire("player_addressed_bot", s, null)).toContain("itto");
+// Same bot, but in "answer everything the owner says" mode.
+const CHATTY = createTriggers({
+  botUsername: "Laoda",
+  wakeWords: ["Laoda", "牢大", "曼巴"],
+  replyToAll: true,
+});
+const fireChatty = (s: GameState) =>
+  CHATTY.find((t) => t.name === "player_addressed_bot")!.check(s, null);
+
+test("chat is a priority trigger (it cuts the slow loop's rate limit)", () => {
+  const addressed = TRIGGERS.find((t) => t.name === "player_addressed_bot")!;
+  expect(addressed.priority).toBe(true);
+  expect(TRIGGERS.find((t) => t.name === "incoming_threat")!.priority).toBeUndefined();
 });
 
-test("player_addressed_bot ignores itto's own messages", () => {
-  const s = makeState({ recentChat: [{ username: "itto", message: "itto here", at: Date.now() }] });
+test("replyToAll answers the owner even without a wake word", () => {
+  const s = makeState({ recentChat: [{ username: "eason", message: "这矿洞真深啊", at: Date.now() }] });
+  expect(fireChatty(s)).toContain("这矿洞真深啊");
+
+  // ...but stays out of other players' conversation
+  const other = makeState({ recentChat: [{ username: "steve", message: "这矿洞真深啊", at: Date.now() }] });
+  expect(fireChatty(other)).toBeNull();
+});
+
+test("replyToAll still ignores the bot's own chat", () => {
+  const s = makeState({ recentChat: [{ username: "Laoda", message: "man, what can I say", at: Date.now() }] });
+  expect(fireChatty(s)).toBeNull();
+});
+
+test("player_addressed_bot fires on the character's name", () => {
+  const s = makeState({ recentChat: [{ username: "eason", message: "牢大 过来", at: Date.now() }] });
+  expect(fire("player_addressed_bot", s, null)).toContain("牢大");
+});
+
+test("player_addressed_bot fires on the in-game username, any casing", () => {
+  const s = makeState({ recentChat: [{ username: "eason", message: "laoda come here", at: Date.now() }] });
+  expect(fire("player_addressed_bot", s, null)).toBeTruthy();
+});
+
+test("player_addressed_bot fires on a wake word", () => {
+  const s = makeState({ recentChat: [{ username: "eason", message: "曼巴？", at: Date.now() }] });
+  expect(fire("player_addressed_bot", s, null)).toBeTruthy();
+});
+
+test("player_addressed_bot ignores the bot's own messages", () => {
+  const s = makeState({ recentChat: [{ username: "Laoda", message: "Laoda 在这", at: Date.now() }] });
+  expect(fire("player_addressed_bot", s, null)).toBeNull();
+});
+
+test("player_addressed_bot ignores unrelated chatter", () => {
+  const s = makeState({ recentChat: [{ username: "eason", message: "这矿洞真大", at: Date.now() }] });
   expect(fire("player_addressed_bot", s, null)).toBeNull();
 });
 

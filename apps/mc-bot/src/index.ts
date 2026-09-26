@@ -1,7 +1,10 @@
 import { mkdirSync } from "node:fs";
-import { createMcpServer, serveHttp } from "@itto/mcp-server";
+import { join } from "node:path";
+import { assertPortAvailable, createMcpServer, serveHttp } from "@itto/mcp-server";
 import { loadConfig } from "./config.js";
-import { createBot, onBotDead } from "./bot/create-bot.js";
+import type { Bot } from "mineflayer";
+import { createBot, onBotDead, type CreateBotOptions } from "./bot/create-bot.js";
+import { VoiceChat } from "./voice/svc.js";
 import { BotController } from "./bot/controller.js";
 import { FastLoop } from "./fast-loop/index.js";
 import { SlowLoop, consoleNudgeSink } from "./slow-loop/index.js";
@@ -12,8 +15,18 @@ import { registerSkillTools, runSkillByName } from "./skills/index.js";
 import type { SkillContext } from "./skills/types.js";
 import { WorldMemory } from "./memory/store.js";
 import { registerMemoryTools } from "./memory/tools.js";
-import { registerVoiceTools } from "./voice/tools.js";
 import { pushChat } from "./state/extract.js";
+import { pushSystem } from "./state/system-log.js";
+import { watchPlayerActions } from "./state/action-watch.js";
+import { clearPlayerActions } from "./state/player-actions.js";
+import { COMMANDS, matchCommand } from "./chat-commands.js";
+import { startupBanner } from "./util/startup-banner.js";
+import { opHint } from "./util/op-hint.js";
+import { loadChineseNames } from "./util/zh-lang.js";
+import { portLine } from "./util/startup-banner.js";
+import { connectWithRetry, shouldExplain } from "./util/connect-retry.js";
+import { assertSupportedVersion } from "./bot/versions.js";
+import { currentCaps } from "./value-caps.js";
 import { setLogLevel, logger } from "./util/logger.js";
 
 const log = logger("main");
@@ -35,8 +48,77 @@ async function main() {
   setLogLevel(cfg.logLevel);
   log.info("booting itto…");
 
+  // Check the MCP port BEFORE joining the world: the usual reason it's taken is
+  // that an earlier itto is still running, and a bot that logs in only to die
+  // two seconds later is worse than one that never logged in.
+  await assertPortAvailable(cfg.mcp.host, cfg.mcp.port);
+
+  // 版本写错是"重试也没用"的错误 —— 让它立刻死，别陷在重试循环里。
+  assertSupportedVersion(cfg.mc.version);
+
+  // 让他眼里的世界说中文：物品/方块/生物的中文名从**你本机 Minecraft 的语言文件**读
+  // （assets 里那份 zh_cn.json，8500+ 条），和你在屏幕上看到的逐字一致。
+  // 读不到不是错误 —— 退回内置小词典，最差显示英文 id。
+  const appData = process.env.APPDATA;
+  const zh = loadChineseNames(
+    [cfg.mc.gameDir, appData ? join(appData, ".minecraft") : undefined].filter(
+      (p): p is string => typeof p === "string" && p.length > 0,
+    ),
+  );
+  if (zh) log.info("中文名已加载：" + zh.count + " 条（" + zh.source + "）");
+  else log.warn("没找到 Minecraft 的中文语言文件 —— 物品名会用内置词典/英文 id 显示");
+
+  // 语音（可选）：**必须在连接之前建好**。
+  // 插件是在 `login` 事件里注册语音通道的，等 spawn 之后再挂就已经错过了 ——
+  // 通道没注册 → 机器人不请求语音密钥 → 永远进不了语音频道（实测踩过）。
+  const voice = cfg.mc.voice.enabled
+    ? new VoiceChat({
+        tts: { voice: cfg.mc.voice.ttsVoice, rate: cfg.mc.voice.rate },
+        // 只听主人的声音：别人说话不算在跟它说话。
+        listenTo: cfg.mc.ownerUsername,
+        onHeard: cfg.mc.voice.hear
+          ? (text, from) => {
+              // 你在语音里说的话 = 你在聊天栏里打的字：进同一条管道、同样唤醒大脑。
+              log.info("（语音）" + from + "：" + text);
+              pushChat(from, text);
+              slow.poke();
+            }
+          : undefined,
+      })
+    : null;
+  if (voice) {
+    log.info(
+      "语音已开启：" +
+        (cfg.mc.voice.hear ? "听你说 + " : "只说、不听（MC_VOICE_HEAR=false）+ ") +
+        "说话用 " +
+        cfg.mc.voice.ttsVoice +
+        "，语速 " +
+        cfg.mc.voice.rate,
+    );
+  }
+  const botOpts: CreateBotOptions = { onBotCreated: (b: Bot) => voice?.attachTo(b) };
+
   // 1 + 2
-  const bot = await createBot(cfg);
+  // 连不上很正常：顺序反了（先开窗口再进世界）、或者「对局域网开放」的端口
+  // 忘了从随机值改成 25565。旧行为是一失败就退出，窗口留着但机器人没了；
+  // 现在跟断线重连一样一直等，并且每次失败都把端口这件事说一遍。
+  const bot = await connectWithRetry({
+    connect: () => createBot(cfg, botOpts),
+    retry: cfg.reconnect.enabled,
+    delayMs: cfg.reconnect.delayMs,
+    maxDelayMs: cfg.reconnect.maxDelayMs,
+    onFail: (err, attempt) => {
+      log.warn("连不上 " + cfg.mc.host + ":" + cfg.mc.port + "（第 " + attempt + " 次）—— " + err.message);
+      log.warn(portLine(cfg.mc.host, cfg.mc.port));
+      if (shouldExplain(attempt)) {
+        log.warn(
+          "再对一遍：① 世界开好了吗 ② 「对局域网开放」的端口是不是 " + cfg.mc.port +
+            " ③ 版本是不是 " + cfg.mc.version + "（.env 的 MC_VERSION 必须一模一样）",
+        );
+      }
+      log.info("我在这儿等着 —— 弄好它自己就进来了（Ctrl+C 或关窗口才会停）。");
+    },
+  });
   const controller = new BotController(bot, cfg);
 
   // world memory: MC-specific spatial facts (waypoints, chest index). Survives
@@ -63,6 +145,16 @@ async function main() {
     onComplete: (goal) => slow.notifyGoalComplete(goal),
   });
 
+  if (voice) {
+    // 所有"它说的话"都从 controller.chat 出去，所以在这里挂一道语音 ——
+    // 聊天回复、#指令回复、任务汇报全都自动带上声音。
+    const chatText = controller.chat.bind(controller);
+    controller.chat = async (message: string) => {
+      await chatText(message);
+      void voice.say(message);
+    };
+  }
+
   // stamp live followState + currentGoal onto every snapshot
   const origGetState = controller.getState.bind(controller);
   controller.getState = () => {
@@ -73,6 +165,17 @@ async function main() {
       followState: fast.followState(),
       currentGoal: g ? { id: g.id, label: g.label, status: g.status, progress: g.progress } : null,
       lastGoal: lg ? { id: lg.id, label: lg.label, status: lg.status, progress: lg.progress } : null,
+      // #free / #stop live on the controller, so stamp them on here — the brain
+      // needs to know it's in free roam before it promises to come running.
+      modes: {
+        freeRoam: controller.isFreeRoam(),
+        pacifist: controller.isPacifist(),
+        holdPosition: controller.isHoldPosition(),
+        muted: controller.isMuted(),
+        guide: controller.isGuide(),
+      },
+      // 玩家用 #value 改过的上限 —— 评估层、向导、大脑都读这一份
+      valueCaps: currentCaps(),
     };
   };
 
@@ -80,26 +183,41 @@ async function main() {
   // the brain: an external agent when configured, else just log.
   const sink =
     cfg.brain.enabled && cfg.brain.cmd.length > 0
-      ? createAgentBrainSink({ cmd: cfg.brain.cmd, dir: cfg.brain.dir, cooldownMs: cfg.brain.cooldownMs })
+      ? createAgentBrainSink({
+          cmd: cfg.brain.cmd,
+          dir: cfg.brain.dir,
+          cooldownMs: cfg.brain.cooldownMs,
+          chatCooldownMs: cfg.brain.chatCooldownMs,
+        })
       : consoleNudgeSink;
   if (cfg.brain.enabled) log.info("brain: external agent");
   const slow = new SlowLoop(controller, cfg, sink, runner, memory);
   slow.start();
 
-  // 5 — MCP server: a fresh instance per connecting session (brain, voice,
-  // dev driver), all wired to the same controller/memory/runner. An McpServer
+  // 5 — MCP server: a fresh instance per connecting session (brain, dev
+  // driver), all wired to the same controller/memory/runner. An McpServer
   // binds exactly one transport, so serveHttp calls this factory per session.
   const buildMcp = () => {
     const mcp = createMcpServer(controller);
     registerSkillTools(mcp, skillCtx);
     registerMemoryTools(mcp, memory, controller);
     registerGoalTools(mcp, runner);
-    registerVoiceTools(mcp);
     return mcp;
   };
 
   const http = await serveHttp(buildMcp, { host: cfg.mcp.host, port: cfg.mcp.port });
   log.info("itto is live. point the brain at the MCP endpoint and join the call.");
+
+  // The runtime cheat-sheet: every hard command (generated from the command
+  // table, so it can't drift) plus the one setup step that lives inside
+  // Minecraft. Plain console.log so it shows even at LOG_LEVEL=warn.
+  // eslint-disable-next-line no-console
+  console.log(
+    startupBanner(cfg.mc.username, cfg.mc.ownerUsername, COMMANDS, {
+      host: cfg.mc.host,
+      port: cfg.mc.port,
+    }).join("\n"),
+  );
 
   // ── connection lifecycle + auto-reconnect ──
   // The MCP server, world memory, and loops persist across reconnects; only the
@@ -109,6 +227,22 @@ async function main() {
 
   const onChat = (username: string, message: string) => {
     if (username === activeBot.username) return;
+
+    // Hard commands first ("#back"): the body does them instantly, and they
+    // never enter the chat buffer — so the brain can't answer the same line a
+    // second time on its next wake.
+    if (username.toLowerCase() === cfg.mc.ownerUsername.toLowerCase()) {
+      const hit = matchCommand(message);
+      if (hit) {
+        log.info(`command ${hit.command.trigger}${hit.arg ? " " + hit.arg : ""} from ${username}`);
+        void hit.command
+          .run({ control: controller, follow: fast.follow, runner }, hit.arg)
+          .then((reply) => (reply ? controller.chat(reply) : undefined))
+          .catch((e) => log.warn(`command ${hit.command.trigger} failed: ${(e as Error).message}`));
+        return;
+      }
+    }
+
     pushChat(username, message);
     slow.poke();
   };
@@ -131,7 +265,7 @@ async function main() {
       log.info(`reconnecting in ${Math.round(delay / 1000)}s…`);
       await new Promise((r) => setTimeout(r, delay));
       try {
-        const nb = await createBot(cfg);
+        const nb = await createBot(cfg, botOpts);
         controller.rebind(nb);
         fast.rebind(nb);
         wireConnection(nb);
@@ -150,10 +284,45 @@ async function main() {
   function wireConnection(b: typeof bot): void {
     activeBot = b;
     b.on("chat", onChat);
+    // The server's own voice: command feedback + errors. Kept so
+    // run_server_command can report what actually happened.
+    b.on("message", (msg) => pushSystem(msg.toString()));
+    // 「他刚做了什么」：被打、捡到稀罕东西、完成进度、死亡、睡下、上下线。
+    // 换连接就清空一次，免得上个会话的事件穿越过来（比如"他死了"其实是十分钟前那次）。
+    clearPlayerActions();
+    watchPlayerActions(b, { owner: cfg.mc.ownerUsername });
     onBotDead(b, (reason) => void handleDead(reason));
   }
 
   wireConnection(bot);
+
+  // ── op 自检（整个进程只做一次）──
+  // Minecraft 里玩家**不能给自己 op**，所以这条 /op 注定被拒。发它的意义在被拒
+  // 之后：机器人在游戏里说一句人话，把两条真正能走的路告诉你。玩家在游戏里，
+  // 终端不一定在看 —— 这句话必须留在游戏里。
+  if (cfg.mc.selfOp) {
+    void (async () => {
+      // 等真正进世界（没 entity 时聊天发不出去）
+      for (let i = 0; i < 60 && !activeBot.entity; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      if (!activeBot.entity) return;
+      try {
+        const probe = await controller.probePermissions();
+        if (probe.canTeleport) {
+          // 常见情况：局域网开了作弊，权限本来就有 —— 什么都不说，别误报。
+          log.info("权限自检：可以瞬移/用指令了（" + (probe.reply || "服务端没吭声") + "）");
+          return;
+        }
+        log.warn(
+          "权限自检：不够（" + (probe.reply || "服务端没吭声") + "）；/op 回执：" + (probe.opReply || "无"),
+        );
+        await controller.chat(opHint(cfg.mc.username, cfg.mc.ownerUsername));
+      } catch (e) {
+        log.debug("权限自检跳过：" + (e as Error).message);
+      }
+    })();
+  }
 
   // graceful shutdown
   const shutdown = async () => {
@@ -170,7 +339,12 @@ async function main() {
   process.on("SIGTERM", shutdown);
 }
 
-main().catch((e) => {
-  log.error("fatal:", e);
+main().catch((e: unknown) => {
+  // Log the message, not the Error object: Bun renders an Error with a source
+  // frame, which buries a one-line config problem (like a taken port) in noise.
+  // The stack is still there with LOG_LEVEL=debug.
+  const err = e instanceof Error ? e : new Error(String(e));
+  log.error(`fatal: ${err.message}`);
+  log.debug(err.stack ?? "");
   process.exit(1);
 });

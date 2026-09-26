@@ -1,0 +1,24 @@
+{
+  "name": "@itto/brain-deepseek",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "smoke": "bun scripts/smoke-test.ts",
+    "key-check": "bun scripts/key-check.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo \"(no linter wired yet)\""
+  },
+  "dependencies": {
+    "@itto/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@itto/mcp-server": "workspace:*",
+    "@types/bun": "^1.1.0",
+    "typescript": "^5.4.0",
+    "zod": "^3.23.0"
+  }
+}

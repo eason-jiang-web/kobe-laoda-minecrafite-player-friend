@@ -1,5 +1,10 @@
 # Architecture
 
+> ⚠️ **上游历史设计文档**：这份写的是项目还在 Hermes + Discord 那套时的样子，
+> 配置项和文件名已经和现在的实现不一致了。当前用法看 [README](../README.md) 和
+> [PCL_DEEPSEEK_SETUP.md](./PCL_DEEPSEEK_SETUP.md)。架构思路（快慢双循环、MCP 分层）仍然成立。
+
+
 The canonical spec is [`./CONTEXT.md`](./CONTEXT.md). This doc maps that spec
 onto the actual files so you can find where each idea lives.
 

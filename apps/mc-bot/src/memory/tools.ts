@@ -4,7 +4,9 @@ import {
   ForgetLocationInput,
   IndexChestInput,
   RecallLocationsInput,
+  RecallNotesInput,
   RememberLocationInput,
+  RememberNoteInput,
   type BotControl,
 } from "@itto/shared";
 import type { WorldMemory } from "./store.js";
@@ -14,6 +16,9 @@ import type { WorldMemory } from "./store.js";
  * the WorldMemory + need the live BotControl), like the skill tools — keeps the
  * mcp-server package free of app state.
  */
+/** Groups this run's notes; reading them back ignores the session. */
+const SESSION = new Date().toISOString().slice(0, 16);
+
 export function registerMemoryTools(server: McpServer, memory: WorldMemory, control: BotControl): void {
   server.tool(
     "remember_location",
@@ -72,11 +77,41 @@ export function registerMemoryTools(server: McpServer, memory: WorldMemory, cont
     },
   );
 
+  server.tool(
+    "remember_note",
+    "Write a short note to your own long-term memory — plans, promises, preferences, anything that is not a place or a chest. Survives restarts.",
+    RememberNoteInput.shape,
+    async ({ text }) => {
+      try {
+        memory.addNote(text, SESSION);
+        return ok("noted: " + text);
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
+  server.tool(
+    "recall_notes",
+    "Read back your recent notes. Use it to remember what you were up to, or what the player asked for earlier.",
+    RecallNotesInput.shape,
+    async ({ limit }) => {
+      try {
+        const notes = memory.recentNotes(Math.min(limit ?? 10, 50)).reverse();
+        if (notes.length === 0) return ok("no notes yet", []);
+        const lines = notes.map((n) => new Date(n.at).toISOString().slice(0, 16) + "  " + n.text);
+        return ok(lines.join("\n"), notes);
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
   server.resource(
     "world-memory",
     "itto://memory/world",
     {
-      description: "Everything itto remembers about this world: waypoints, chest contents, notes (JSON).",
+      description: "Everything you remember about this world: waypoints, chest contents, notes (JSON).",
       mimeType: "application/json",
     },
     async (uri) => ({
