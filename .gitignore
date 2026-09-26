@@ -27,9 +27,11 @@ pnpm-debug.log*
 !.vscode/extensions.json
 
 # bot runtime state (local worlds, caches)
-.cache/
-data/
-worlds/
+# 注意：必须锚定根目录（前导 /）—— 否则会连 vendor 里的 lib/data/ 一起忽略掉，
+# 那种"本地能跑、别人 clone 下来少文件"的坑就是这么来的（实测踩过）。
+/.cache/
+/data/
+/worlds/
 
 # hermes lives OUTSIDE this repo, but just in case someone clones it here
 hermes/
