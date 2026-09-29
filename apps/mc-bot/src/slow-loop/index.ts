@@ -4,7 +4,15 @@ import type { BotController } from "../bot/controller.js";
 import type { Config } from "../config.js";
 import type { WorldMemory } from "../memory/store.js";
 import type { GoalRunner } from "./goal-runner.js";
-import { createTriggers, MEMORY_TRIGGERS, VibeCheck, HeartbeatCheck, type Trigger } from "./triggers.js";
+import {
+  createTriggers,
+  DEFAULT_TRIGGER_COOLDOWN_MS,
+  MEMORY_TRIGGERS,
+  triggerReady,
+  VibeCheck,
+  HeartbeatCheck,
+  type Trigger,
+} from "./triggers.js";
 import { MilestoneTracker, parseMilestones } from "./milestones.js";
 import { memeHint, rollMeme } from "./meme.js";
 import {
@@ -63,6 +71,12 @@ export class SlowLoop {
   /** "You've got 128 logs now" — progress worth telling the player about. */
   private readonly milestones: MilestoneTracker;
   private lastNudgeAt = 0;
+  /**
+   * 每个触发器上次响的时间 —— 触发器的冷却靠它。
+   * 没有它的话，玩家砍树时每捡一个木头就叫醒大脑一次（实测 2 分钟叫了 24 次，
+   * 每次都把同一个进度换个说法再报一遍）。
+   */
+  private readonly lastFired = new Map<string, number>();
   /** A goal that just finished, waiting to be surfaced to the brain once. */
   private lastCompleted: BotGoal | null = null;
   /** 上次扫矿的时间（机会主义采矿的节流）。 */
@@ -179,20 +193,29 @@ export class SlowLoop {
     // 机会主义采矿：路过值钱的矿就先判断（挖得动吗 / 还缺吗），剩下交给大脑。
     if (!reason && !quiet) this.watchOres(state);
 
+    const now = Date.now();
     if (!reason) {
       for (const t of this.triggers) {
+        // 冷却没过就**连 check 都不调**：这个触发器的 check 会把动作取走，
+        // 不调它，动作就攒着，下次一起说（"他刚刚：捡起了 A；捡起了 B"）。
+        if (!triggerReady(t, this.lastFired, now)) continue;
         const r = t.check(state, this.prev);
         if (r) {
           reason = r;
           priority = t.priority === true;
+          this.lastFired.set(t.name, now);
           break;
         }
       }
     }
     if (!reason && !quiet) {
       for (const t of MEMORY_TRIGGERS) {
+        if (!triggerReady(t, this.lastFired, now)) continue;
         reason = t.check(state, this.prev, this.memory);
-        if (reason) break;
+        if (reason) {
+          this.lastFired.set(t.name, now);
+          break;
+        }
       }
     }
     if (!reason && !quiet && this.vibe.due())

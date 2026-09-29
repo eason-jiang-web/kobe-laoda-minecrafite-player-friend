@@ -8,6 +8,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { openerOf } from "@itto/shared";
 
 export interface HistoryEntry {
   /** epoch ms */
@@ -56,8 +57,35 @@ function isEntry(v: unknown): v is HistoryEntry {
   return typeof e.at === "number" && typeof e.reason === "string" && typeof e.said === "string";
 }
 
+/**
+ * 最近几句开场白用得太像时的提醒。
+ *
+ * 为什么非要有：光把说过的话列出来**反而会强化**这个习惯 —— 它看到「收到 man」
+ * 成了自己的风格，就接着用。实测 24 句里 18 句是同一个开头，所以这里必须显式点破。
+ */
+export function openerWarning(entries: HistoryEntry[]): string | null {
+  const said = entries.filter((e) => e.said.length > 0);
+  if (said.length < 3) return null;
+
+  const counts = new Map<string, { n: number; sample: string }>();
+  for (const e of said) {
+    const open = openerOf(e.said);
+    if (open.length < 2) continue;
+    const hit = counts.get(open);
+    if (hit) hit.n += 1;
+    else counts.set(open, { n: 1, sample: e.said });
+  }
+  const worst = [...counts.values()].sort((a, b) => b.n - a.n)[0];
+  if (!worst || worst.n < 3) return null;
+  return (
+    "⚠️ 你最近 " + worst.n + " 句都是「" + worst.sample.slice(0, 10) +
+    "…」这个开头 —— 这次换个开场白（或者干脆别说）。"
+  );
+}
+
 export function formatHistory(entries: HistoryEntry[], now = Date.now()): string {
-  return entries
+  const warning = openerWarning(entries);
+  const body = entries
     .map((e) => {
       const mins = Math.max(0, Math.round((now - e.at) / 60_000));
       const when = mins < 1 ? "just now" : mins + "m ago";
@@ -68,6 +96,7 @@ export function formatHistory(entries: HistoryEntry[], now = Date.now()): string
       return "- " + when + " | " + clip(e.reason, 160) + " ->" + said + did + note;
     })
     .join("\n");
+  return warning ? body + "\n" + warning : body;
 }
 
 function clip(s: string, max: number): string {

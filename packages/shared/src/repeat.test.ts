@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 import {
   findRepeat,
   normalizeLine,
+  openerOf,
   rememberSaid,
   REPEAT_WINDOW_MS,
+  repeatedOpener,
   similarity,
   type SaidLine,
 } from "./repeat.js";
@@ -66,6 +68,33 @@ describe("findRepeat —— 真实踩过的那句话", () => {
     const recent = [said("嗯", T0)];
     expect(findRepeat("嗯", recent, T0 + 1000)).not.toBeNull();
     expect(findRepeat("   ", recent, T0 + 1000)).toBeNull();
+  });
+});
+
+describe("repeatedOpener —— 字面不同但形状一样的复读", () => {
+  test("同一个开头用两次，第三次就要换", () => {
+    const recent = [said("收到 man，木头凑到 8 根了"), said("收到 man，东北那两棵树我包了")];
+    expect(repeatedOpener("收到 man，石头我这就去刨", recent, T0 + 1000)).not.toBeNull();
+  });
+
+  test("只出现一次不算腻", () => {
+    const recent = [said("收到 man，木头凑到 8 根了")];
+    expect(repeatedOpener("收到 man，石头我这就去刨", recent, T0 + 1000)).toBeNull();
+  });
+
+  test("换个开头就没事", () => {
+    const recent = [said("收到 man，木头凑到 8 根了"), said("收到 man，东北那棵树我包了")];
+    expect(repeatedOpener("行，那我去刨石头", recent, T0 + 1000)).toBeNull();
+  });
+
+  test("开场白怎么看：「收到 man，」归一化后取前四个字", () => {
+    expect(openerOf("收到 man，木头")).toBe(openerOf("收到man 木头"));
+    expect(openerOf("收到 man，木头")).not.toBe(openerOf("好嘞，木头"));
+  });
+
+  test("太短的开头（「嗯」「好」）不当开场白算", () => {
+    const recent = [said("嗯"), said("嗯")];
+    expect(repeatedOpener("嗯", recent, T0 + 1000)).toBeNull();
   });
 });
 

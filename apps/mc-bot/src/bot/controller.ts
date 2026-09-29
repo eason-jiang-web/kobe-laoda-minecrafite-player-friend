@@ -11,7 +11,7 @@ import type {
   Vec3Lit,
 } from "@itto/shared";
 // 值导入（不是 type）：中文名 → id 的归一化，工具入参都要过这一道
-import { findRepeat, rememberSaid, toItemId, type SaidLine } from "@itto/shared";
+import { findRepeat, rememberSaid, repeatedOpener, toItemId, type SaidLine } from "@itto/shared";
 import type { Config } from "../config.js";
 import { extractGameState } from "../state/extract.js";
 import { systemSince } from "../state/system-log.js";
@@ -330,6 +330,17 @@ export class BotController implements BotControl {
         why:
           "这句你刚说过（" + secs + " 秒前：「" + hit.text + "」）—— 没发出去。" +
           "要么说点**新的**，要么这一次什么都别说（沉默是允许的）。",
+      };
+    }
+    // 字面不同、但开头一模一样的也算复读：实测 24 句里 18 句是「收到 man，…」开头，
+    // 正文句句不同，可读起来就是复读机。同一个开头用两次以上就叫停。
+    const opener = repeatedOpener(message, this.recentSaid, now);
+    if (opener) {
+      return {
+        ok: false,
+        why:
+          "你这几句都是「" + opener.text.slice(0, 12) + "…」这个开头 —— 没发出去。" +
+          "换个开场白，或者这回干脆别说（沉默是可以的）。",
       };
     }
     await this.chat(message);

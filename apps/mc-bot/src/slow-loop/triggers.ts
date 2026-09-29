@@ -16,13 +16,43 @@ export interface Trigger {
    * talking to you right now" — a reply that lands 10s late isn't a reply.
    */
   priority?: boolean;
+  /**
+   * 这个触发器最短多久响一次（不填用 DEFAULT_TRIGGER_COOLDOWN_MS）。
+   *
+   * 为什么必须要有：「他刚干了什么」这个触发器在玩家**每捡起一个东西**时都成立。
+   * 实测他砍树那两分钟里大脑被叫醒了 24 次，每次把同一个进度换个说法再报一遍
+   * （历史里 18 句都以「收到 man，」开头）。事件触发器不设冷却 = 刷屏。
+   */
+  cooldownMs?: number;
   /** Return a short reason string if it should fire, else null. */
   check(state: GameState, prev: GameState | null): string | null;
+}
+
+/** 没写 cooldownMs 的触发器用这个。 */
+export const DEFAULT_TRIGGER_COOLDOWN_MS = 60_000;
+
+/**
+ * 这个触发器现在能不能响。
+ *
+ * priority 的（他被打/死了、有人在跟他说话）**不设冷却** —— 那类事晚 10 秒说就没意义了。
+ */
+export function triggerReady(
+  trigger: { name: string; priority?: boolean; cooldownMs?: number },
+  lastFired: Map<string, number>,
+  now: number,
+  defaultCooldownMs: number = DEFAULT_TRIGGER_COOLDOWN_MS,
+): boolean {
+  if (trigger.priority) return true;
+  const last = lastFired.get(trigger.name);
+  if (last === undefined) return true;
+  return now - last >= (trigger.cooldownMs ?? defaultCooldownMs);
 }
 
 /** A trigger that also needs world memory (kept separate so pure triggers stay pure). */
 export interface MemoryTrigger {
   name: string;
+  /** 同上：不问清楚就等着刷屏。 */
+  cooldownMs?: number;
   check(state: GameState, prev: GameState | null, memory: WorldMemory): string | null;
 }
 
@@ -82,10 +112,22 @@ const STATIC_TRIGGERS: Trigger[] = [
   },
   {
     name: "player_did_something",
-    check: () => actionsToReason(takePlayerActions(CASUAL_ACTIONS)),
+    // 两分钟一次：他捡东西的频率太高。这个触发的价值是「偶尔搭一句」，
+    // 不是「每个木头都汇报一遍」。
+    cooldownMs: 120_000,
+    check: (s) => {
+      const actions = takePlayerActions(CASUAL_ACTIONS);
+      if (actions.length === 0) return null;
+      // 任务正在跑的时候，「捡到任务要的东西」只是进度、不是新闻 ——
+      // 任务结算会一次性汇报。稀有的（钻石那种 important）照样叫醒，那值得说。
+      const goalRunning = s.currentGoal?.status === "active";
+      const news = goalRunning ? actions.filter((a) => a.important || a.kind !== "pickup") : actions;
+      return news.length > 0 ? actionsToReason(news) : null;
+    },
   },
   {
     name: "incoming_threat",
+    cooldownMs: 30_000,
     check: (s, prev) => {
       const close = s.nearbyHostiles.find((h) => h.distance < 10);
       if (!close) return null;
@@ -96,6 +138,8 @@ const STATIC_TRIGGERS: Trigger[] = [
   },
   {
     name: "player_in_danger",
+    // 这是「持续成立」的判断（附近有怪就成立），不设冷却会每跳都响
+    cooldownMs: 90_000,
     check: (s) => {
       // we can't see the player's health, but proximity of mobs to them +
       // night is a decent proxy. Placeholder heuristic.

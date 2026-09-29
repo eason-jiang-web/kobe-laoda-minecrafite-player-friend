@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { normalizeSchema } from "./schema.js";
-import { formatHistory, type HistoryEntry } from "./history.js";
+import { formatHistory, openerWarning, type HistoryEntry } from "./history.js";
 
 describe("normalizeSchema", () => {
   test("strips $schema and forces an object root", () => {
@@ -65,6 +65,27 @@ describe("formatHistory", () => {
     expect(out).toContain("心里想：砍树任务还在跑");
     // 独白不能冒充成"说过了"
     expect(out).not.toContain('说了 "砍树任务还在跑');
+  });
+
+  test("开场白连着用三次，就当面点破 —— 光列出来反而会强化这个习惯", () => {
+    const entries: HistoryEntry[] = [
+      { at: 1_000, reason: "x", said: "收到 man，木头凑到 8 根了", did: ["chat"] },
+      { at: 2_000, reason: "x", said: "收到 man，东北那两棵树我包了", did: ["chat"] },
+      { at: 3_000, reason: "x", said: "收到 man，石头这就去刨", did: ["chat"] },
+    ];
+    const out = formatHistory(entries, 4_000);
+    expect(out).toContain("⚠️");
+    expect(out).toContain("换个开场白");
+    expect(openerWarning(entries)).toContain("3 句");
+  });
+
+  test("各说各的就不啰嗦", () => {
+    const entries: HistoryEntry[] = [
+      { at: 1_000, reason: "x", said: "东北边有棵树", did: ["chat"] },
+      { at: 2_000, reason: "x", said: "天黑了先回基地", did: ["chat"] },
+      { at: 3_000, reason: "x", said: "我这就去下矿", did: ["chat"] },
+    ];
+    expect(formatHistory(entries, 4_000)).not.toContain("⚠️");
   });
 
   test("多句用 ｜ 连起来，一眼看得出这轮说了几句", () => {

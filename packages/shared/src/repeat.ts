@@ -70,6 +70,37 @@ export function findRepeat(
   return null;
 }
 
+/** 开场白用几次就算腻。 */
+export const OPENER_MAX_REPEATS = 2;
+
+/**
+ * 归一化后的前几个字，当作「开场白」。
+ * 「收到 man，…」归一化后是「收到man…」，取前 4 个就是「收到ma」——
+ * 18 句用同一个开头，读起来就是复读机，哪怕正文各不相同。
+ */
+export function openerOf(line: string, len = 4): string {
+  return normalizeLine(line).slice(0, len);
+}
+
+/**
+ * 这句的开场白是不是已经用腻了（同一个开头在窗口内出现过 max 次以上）。
+ *
+ * 为什么单列一条：字面不一样、但形状一样的复读，靠 findRepeat 是抓不住的 ——
+ * 实测 24 句里 18 句以「收到 man，」开头，正文却句句不同。
+ */
+export function repeatedOpener(
+  line: string,
+  recent: SaidLine[],
+  now: number,
+  windowMs: number = REPEAT_WINDOW_MS,
+  max: number = OPENER_MAX_REPEATS,
+): SaidLine | null {
+  const open = openerOf(line);
+  if (open.length < 2) return null; // 太短的开头（「嗯」「好」）不算开场白
+  const same = recent.filter((r) => now - r.at < windowMs && openerOf(r.text) === open);
+  return same.length >= max ? (same[same.length - 1] ?? null) : null;
+}
+
 /** 记一笔（顺手丢掉过期的，只留最近 keep 条）。 */
 export function rememberSaid(
   recent: SaidLine[],

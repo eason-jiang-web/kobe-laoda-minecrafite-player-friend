@@ -1,6 +1,36 @@
-import { test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { GameState } from "@itto/shared";
-import { createTriggers } from "./triggers.js";
+import { createTriggers, DEFAULT_TRIGGER_COOLDOWN_MS, triggerReady } from "./triggers.js";
+
+describe("triggerReady —— 触发器自己的冷却", () => {
+  const now = 1_700_000_000_000;
+
+  test("第一次一定放行", () => {
+    expect(triggerReady({ name: "t" }, new Map(), now)).toBe(true);
+  });
+
+  test("冷却没过就不放行 —— 这条救了那 24 次唤醒", () => {
+    const fired = new Map([["player_did_something", now]]);
+    expect(triggerReady({ name: "player_did_something", cooldownMs: 120_000 }, fired, now + 30_000)).toBe(false);
+    expect(triggerReady({ name: "player_did_something", cooldownMs: 120_000 }, fired, now + 121_000)).toBe(true);
+  });
+
+  test("没写 cooldownMs 的用默认值", () => {
+    const fired = new Map([["t", now]]);
+    expect(triggerReady({ name: "t" }, fired, now + DEFAULT_TRIGGER_COOLDOWN_MS - 1)).toBe(false);
+    expect(triggerReady({ name: "t" }, fired, now + DEFAULT_TRIGGER_COOLDOWN_MS)).toBe(true);
+  });
+
+  test("priority 的（被打/死了、有人在跟他说话）永远不冷却", () => {
+    const fired = new Map([["player_hurt_or_died", now]]);
+    expect(triggerReady({ name: "player_hurt_or_died", priority: true }, fired, now + 1)).toBe(true);
+  });
+
+  test("各触发器各算各的", () => {
+    const fired = new Map([["a", now]]);
+    expect(triggerReady({ name: "b" }, fired, now)).toBe(true);
+  });
+});
 
 // The character is 牢大 / Laoda; the wake words are what the player types.
 const TRIGGERS = createTriggers({
