@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { GameState, InventoryItem } from "@itto/shared";
 import { canMine, needForOre } from "@itto/shared";
-import { buildAutoplayReason, oreReason, type MemoryDigestSource } from "./index.js";
+import { buildAutoplayReason, oreReason, shouldHeartbeat, type MemoryDigestSource } from "./index.js";
 
 const state = {
   self: { health: 20, food: 18, heldItem: "iron_axe", followState: "IDLE" },
@@ -25,6 +25,26 @@ function memory(notes: string[], places: Array<[string, number, number, number]>
 
 const inv = (pairs: Array<[string, number]>): InventoryItem[] => pairs.map(([name, count]) => ({ name, count }));
 const ore = { name: "diamond_ore", pos: { x: 12, y: -54, z: 30 }, distance: 7 };
+
+describe("shouldHeartbeat — 什么时候该叫醒它", () => {
+  test("任务正在跑：不叫（这句话刷过屏）", () => {
+    // 实测：任务在跑时每 45 秒叫一次，它只能回「砍树任务还在跑，不吭声了。」
+    expect(shouldHeartbeat({ quiet: false, guide: false, idle: false })).toBe(false);
+  });
+
+  test("闲着没事：叫，让它自己找活干", () => {
+    expect(shouldHeartbeat({ quiet: false, guide: false, idle: true })).toBe(true);
+  });
+
+  test("#quiet 闭嘴模式：一律不叫", () => {
+    expect(shouldHeartbeat({ quiet: true, guide: false, idle: true })).toBe(false);
+    expect(shouldHeartbeat({ quiet: true, guide: true, idle: false })).toBe(false);
+  });
+
+  test("向导模式：即使手上有任务也叫（提示下一步是这个模式的本职）", () => {
+    expect(shouldHeartbeat({ quiet: false, guide: true, idle: false })).toBe(true);
+  });
+});
 
 describe("oreReason — 路过一块矿的三条路", () => {
   test("can't mine it: remember the spot and say so", () => {

@@ -137,6 +137,17 @@ function loadWikiNotes(path: string): WikiNotes | null {
 /**
  * 读身体写的画像摘要。没有/坏了都返回空串 —— 经验读不到不该影响开工。
  */
+/** 从 chat 工具的参数里抠出那句话（参数可能是坏 JSON，抠不到就算了）。 */
+function chatMessageOf(raw: string | undefined): string | null {
+  try {
+    const parsed: unknown = JSON.parse(raw ?? "{}");
+    const m = (parsed as { message?: unknown }).message;
+    return typeof m === "string" && m.trim().length > 0 ? m.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 function loadProfileDigest(path: string): string {
   try {
     return readFileSync(path, "utf8").trim();
@@ -186,8 +197,14 @@ function buildSystemPrompt(
     "Rules of engagement:",
     "- The snapshot in the prompt is already a moment stale. Read live state first: "
       + "call read_resource with itto://state/current.txt (or itto://state/current for JSON).",
-    "- To speak in game, call the chat tool with ONE short, casual line (中文，短句，偶尔一句 man what can I say). "
-      + "有话就说，别憋着；但没什么可说的时候也不用硬找话 —— 安静地跟着也是一种陪伴。",
+    "- 想说话只有一条路：调 chat 工具（中文，一两句，偶尔带一句 man / What can I say）。",
+    "- **你最后写的那段文字，玩家看不见** —— 游戏里只有 chat 工具发出去的话才算数。"
+      + "所以不想说就**什么都别调、直接结束这一轮**；千万别写一句「我不吭声了」当结尾 —— "
+      + "那句没人看得到，而且你以前每一轮都这么写（历史记录里一大片）。",
+    "- **同一句话不说第二遍**：身体会把 5 分钟内说过的、或者几乎一样的（只差一个「了」这种）直接拦掉，"
+      + "返回「刚说过」。被拦了就换**真正新的**内容，或者干脆闭嘴 —— 别改个标点再试一次。",
+    "- **该闭嘴就闭嘴**：没事发生的心跳、他捡了个东西、你自己排的活正在正常跑、上一句已经说清楚的事 ——"
+      + " 这些情况**一个 chat 都别发**。安静地跟着也是陪玩；没话说的时候沉默才是对的，不是失职。",
     "- For anything multi-step (chop a tree, mine a vein, fetch an item, fight mobs, build), "
       + "call set_goal with an intent and let the body carry it out. Check the goal line in the snapshot first "
       + "- never re-set a goal that is already active.",
@@ -228,7 +245,8 @@ function buildSystemPrompt(
       + "自己看一眼就知道的（附近有什么怪、手上有没有镐子、这树砍不砍得动）别问。",
     "- **他跟你说话，你必须出声**：哪怕只是一句「行，我这就去」也比一声不吭强 —— "
       + "憋着不说话，他会以为你坏了。真不知道该干嘛就问一句（ask_player），"
-      + "或者先按最合理的理解动起来再告诉他。",
+      + "或者先按最合理的理解动起来再告诉他。"
+      + "但**只回一句**：他问一句你答一句，别把同样的话铺开说、别把上一轮的台词再搬出来。",
     "- **越玩越懂他**：干完一件事顺手调 note_experience 记一笔 —— 某门本事成了/砸了（outcome），"
       + "或者一句教训/他的偏好（lesson）。记下来的东西下次唤醒会出现在上面的经验区里。"
       + "只记下次用得上的，别记流水账。想知道自己现在什么水平就看 itto://profile/current。",
@@ -401,7 +419,12 @@ async function main(): Promise<void> {
     if (priorContext.length > 0) {
       messages.push({
         role: "system",
-        content: "What you already said and did recently, oldest first:\n" + priorContext,
+        content:
+          "你最近说过的话、做过的事（最早的在前面）。\n"
+          + "「说了」后面是玩家**真的听到**的话；「没说话」就是那一轮你保持了沉默"
+          + "（那是允许的，而且是常态，不是失职）。\n"
+          + "**同一句话不要再说第二遍** —— 身体会拦掉重复的，别浪费回合。\n"
+          + priorContext,
       });
     }
     messages.push({ role: "user", content: prompt });
@@ -412,7 +435,10 @@ async function main(): Promise<void> {
     /** Fingerprints of calls already made this run — see the loop below. */
     const already = new Set<string>();
     const startedAt = Date.now();
-    let said = "";
+    /** 模型收尾时写的那段文字 —— 玩家看不到，只是它的内心独白。 */
+    let closing = "";
+    /** chat 工具真的发出去的话（玩家听到的就是这些）。 */
+    const spoken: string[] = [];
     const deadline = startedAt + cfg.budgetMs;
 
     for (let step = 0; step < cfg.maxSteps; step++) {
@@ -426,7 +452,7 @@ async function main(): Promise<void> {
 
       const calls = reply.tool_calls ?? [];
       if (calls.length === 0) {
-        said = (reply.content ?? "").trim();
+        closing = (reply.content ?? "").trim();
         break;
       }
 
@@ -449,6 +475,11 @@ async function main(): Promise<void> {
 
         const result = await runTool(client, call, cfg);
         did.push(call.function.name);
+        // 逼出来的话要记住 —— 下一轮醒来才知道自己说过什么（防复读的关键）
+        if (call.function.name === "chat" && !result.startsWith("error:")) {
+          const line = chatMessageOf(call.function.arguments);
+          if (line) spoken.push(line);
+        }
         toolLog.push({ name: call.function.name, args: call.function.arguments ?? "", result });
         messages.push({ role: "tool", tool_call_id: call.id, content: result });
       }
@@ -456,7 +487,13 @@ async function main(): Promise<void> {
 
     appendHistory(
       cfg.historyPath,
-      { at: Date.now(), reason: prompt, said: said.slice(0, 240), did },
+      {
+        at: Date.now(),
+        reason: prompt,
+        said: spoken.join(" ｜ ").slice(0, 240),
+        ...(closing.length > 0 ? { note: closing.slice(0, 160) } : {}),
+        did,
+      },
       cfg.historyKeep,
     );
 
@@ -472,7 +509,7 @@ async function main(): Promise<void> {
           reason: process.env.ITTO_BRAIN_REASON ?? prompt.slice(0, 400),
           state: process.env.ITTO_BRAIN_STATE ?? "",
           tools: toolLog,
-          said,
+          said: spoken.join(" ｜ "),
           steps: did.length,
           ms: Date.now() - startedAt,
           ...(cfg.trainFullPrompt ? { prompt } : {}),
@@ -484,7 +521,9 @@ async function main(): Promise<void> {
 
     summary(
       "done · model=" + cfg.model + " steps=" + did.length
-        + (said.length > 0 ? " · said: " + said.replace(/\s+/g, " ") : " · stayed quiet"),
+        + (spoken.length > 0
+          ? " · said: " + spoken.join(" ｜ ").replace(/\s+/g, " ")
+          : " · stayed quiet" + (closing.length > 0 ? " (内心独白: " + closing.replace(/\s+/g, " ").slice(0, 60) + ")" : "")),
     );
   } finally {
     await client.close().catch(() => undefined);

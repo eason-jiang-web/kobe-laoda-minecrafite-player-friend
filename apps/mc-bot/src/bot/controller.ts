@@ -11,7 +11,7 @@ import type {
   Vec3Lit,
 } from "@itto/shared";
 // 值导入（不是 type）：中文名 → id 的归一化，工具入参都要过这一道
-import { toItemId } from "@itto/shared";
+import { findRepeat, rememberSaid, toItemId, type SaidLine } from "@itto/shared";
 import type { Config } from "../config.js";
 import { extractGameState } from "../state/extract.js";
 import { systemSince } from "../state/system-log.js";
@@ -309,6 +309,32 @@ export class BotController implements BotControl {
     const cut = clean.slice(0, MC_CHAT_LIMIT - 1) + "…";
     log.warn("chat too long (" + clean.length + " chars), truncated: " + cut.slice(0, 48) + "…");
     this.bot.chat(cut);
+  }
+
+  /** 最近说过的话（防复读的刹车，见 shared/repeat.ts）。 */
+  private recentSaid: SaidLine[] = [];
+
+  /**
+   * 大脑主动说话走这里：5 分钟内说过一模一样的、或者几乎一样的话，就**不发**。
+   *
+   * 实测被这句话刷屏过：「砍树任务还在跑，不吭声了。」连着四条。
+   * 提示词里已经写了别复读，但模型每次都是新进程 —— 只有身体拦得住。
+   */
+  async chatIfNew(message: string): Promise<{ ok: boolean; why?: string }> {
+    const now = Date.now();
+    const hit = findRepeat(message, this.recentSaid, now);
+    if (hit) {
+      const secs = Math.max(1, Math.round((now - hit.at) / 1000));
+      return {
+        ok: false,
+        why:
+          "这句你刚说过（" + secs + " 秒前：「" + hit.text + "」）—— 没发出去。" +
+          "要么说点**新的**，要么这一次什么都别说（沉默是允许的）。",
+      };
+    }
+    await this.chat(message);
+    this.recentSaid = rememberSaid(this.recentSaid, message, now);
+    return { ok: true };
   }
 
   /**

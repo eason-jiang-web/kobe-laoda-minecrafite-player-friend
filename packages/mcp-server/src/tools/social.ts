@@ -32,7 +32,10 @@ export function registerSocialTools(server: McpServer, control: BotControl): voi
         );
       }
       try {
-        await control.chat(message);
+        // 走 chatIfNew 而不是 chat：大脑最容易犯的毛病就是复读同一句
+        // （实测连着四条「砍树任务还在跑，不吭声了。」），身体这边兜一道硬的。
+        const res = await control.chatIfNew(message);
+        if (!res.ok) return fail(res.why ?? "这句刚说过，别复读");
         return ok("sent");
       } catch (e) {
         return fail((e as Error).message);

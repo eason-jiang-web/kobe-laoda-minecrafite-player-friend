@@ -48,7 +48,29 @@ describe("formatHistory", () => {
     ];
     const out = formatHistory(entries, 61_000);
     expect(out).toContain('eason said "itto"');
-    expect(out).toContain('said "yo" [chat]');
-    expect(out).toContain("stayed quiet");
+    expect(out).toContain('说了 "yo" [chat]');
+    expect(out).toContain("没说话");
+  });
+
+  test("说出去的话 和 心里想的话 要分得清 —— 这是防复读的前提", () => {
+    // 真实踩过的：它每轮都写一句「砍树任务还在跑，不吭声了。」当收尾，
+    // 那句话根本没发到游戏里，却被记成"说过了"，下一轮它照着又写一遍。
+    const entries: HistoryEntry[] = [
+      { at: 1_000, reason: "heartbeat", said: "树砍完了，128 个木头", did: ["chat"] },
+      { at: 2_000, reason: "heartbeat", said: "", note: "砍树任务还在跑，不吭声了。", did: ["read_resource"] },
+    ];
+    const out = formatHistory(entries, 61_000);
+    expect(out).toContain('说了 "树砍完了，128 个木头"');
+    expect(out).toContain("没说话");
+    expect(out).toContain("心里想：砍树任务还在跑");
+    // 独白不能冒充成"说过了"
+    expect(out).not.toContain('说了 "砍树任务还在跑');
+  });
+
+  test("多句用 ｜ 连起来，一眼看得出这轮说了几句", () => {
+    const entries: HistoryEntry[] = [
+      { at: 1_000, reason: "x", said: "来了 man ｜ 这就开挖", did: ["chat", "chat"] },
+    ];
+    expect(formatHistory(entries, 2_000)).toContain("来了 man ｜ 这就开挖");
   });
 });

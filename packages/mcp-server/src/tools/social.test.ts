@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { BotControl } from "@itto/shared";
+import { findRepeat, rememberSaid, type BotControl, type SaidLine } from "@itto/shared";
 import { looksLikeCommand, registerSocialTools } from "./social.js";
 
 type Handler = (args: Record<string, unknown>) => Promise<{ isError?: boolean; content: Array<{ text: string }> }>;
@@ -9,6 +9,7 @@ type Handler = (args: Record<string, unknown>) => Promise<{ isError?: boolean; c
 function capture(): { handlers: Record<string, Handler>; said: string[] } {
   const handlers: Record<string, Handler> = {};
   const said: string[] = [];
+  let recent: SaidLine[] = [];
   const fakeServer = {
     tool: (name: string, _desc: string, _shape: unknown, handler: Handler) => {
       handlers[name] = handler;
@@ -17,6 +18,14 @@ function capture(): { handlers: Record<string, Handler>; said: string[] } {
   const control = {
     chat: async (m: string) => {
       said.push(m);
+    },
+    // 假身体也照真身体的规矩来：最近说过的就不再发
+    chatIfNew: async (m: string) => {
+      const hit = findRepeat(m, recent, Date.now());
+      if (hit) return { ok: false, why: "刚说过：「" + hit.text + "」" };
+      recent = rememberSaid(recent, m, Date.now());
+      said.push(m);
+      return { ok: true };
     },
     runServerCommand: async (c: string) => "ran " + c,
   } as unknown as BotControl;
@@ -51,6 +60,23 @@ describe("chat tool", () => {
     const res = await handlers.chat!({ message: "走了兄弟" });
     expect(res.isError).toBeFalsy();
     expect(said).toEqual(["走了兄弟"]);
+  });
+
+  test("同一句话不会说第二遍（身体硬拦，一个字都不发）", async () => {
+    const { handlers, said } = capture();
+    const first = await handlers.chat!({ message: "砍树任务还在跑，不吭声了。" });
+    expect(first.isError).toBeFalsy();
+    expect(said.length).toBe(1);
+
+    const again = await handlers.chat!({ message: "砍树任务还在跑，不吭声了。" });
+    expect(again.isError).toBe(true);
+    expect(again.content[0]!.text).toContain("刚说过");
+    expect(said.length).toBe(1); // 没发出去
+
+    // 换个说法说新内容照样能说
+    const fresh = await handlers.chat!({ message: "树砍完了，128 个木头" });
+    expect(fresh.isError).toBeFalsy();
+    expect(said.length).toBe(2);
   });
 
   test("server_command still runs (through the allow-list)", async () => {

@@ -44,6 +44,15 @@ export interface BotControl {
   chat(message: string): Promise<void>;
 
   /**
+   * **大脑专用**的说话口：同一句话（或近似重复）刚说过就不再发。
+   *
+   * 为什么单独开一个而不是改 chat()：硬指令的回复（#back 之类）该能重复 ——
+   * 你问两遍它就答两遍，那是对的。只有大脑"主动找话说"才需要这道刹车。
+   * 返回 ok:false 时**一个字都没发出去**，why 直接给模型看。
+   */
+  chatIfNew(message: string): Promise<{ ok: boolean; why?: string }>;
+
+  /**
    * Run a server command through the chat bar ("time set day" — the slash is
    * optional). Only commands on the configured allow-list actually run, and the
    * return value includes the server's own reply so the brain learns whether it

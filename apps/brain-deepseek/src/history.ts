@@ -14,8 +14,16 @@ export interface HistoryEntry {
   at: number;
   /** what woke the brain (the nudge reason / prompt) */
   reason: string;
-  /** the final chat line it decided to say, if any */
+  /**
+   * 玩家**真的听到**的话（chat 工具发出去的那几句，多句用 ｜ 连）。
+   *
+   * 注意这里以前存的是"模型最后那段文字"，而那段话**根本不会出现在游戏里** ——
+   * 于是它每次醒来都不知道自己刚才说过什么，就一遍遍甩同一句
+   * （真实历史：连着四条「砍树任务还在跑，不吭声了。」）。
+   */
   said: string;
+  /** 模型自己的收尾备注 —— 没发出去过，只代表它当时怎么想的。 */
+  note?: string;
   /** MCP tools it called */
   did: string[];
 }
@@ -53,9 +61,11 @@ export function formatHistory(entries: HistoryEntry[], now = Date.now()): string
     .map((e) => {
       const mins = Math.max(0, Math.round((now - e.at) / 60_000));
       const when = mins < 1 ? "just now" : mins + "m ago";
-      const said = e.said ? ' said "' + clip(e.said, 140) + '"' : " stayed quiet";
+      // 说清楚哪个是"玩家真的听到了"：这里是防复读最重要的一条信息
+      const said = e.said ? ' 说了 "' + clip(e.said, 140) + '"' : " 没说话";
       const did = e.did.length > 0 ? " [" + e.did.join(", ") + "]" : "";
-      return "- " + when + " | " + clip(e.reason, 160) + " ->" + said + did;
+      const note = e.note && e.note !== e.said ? "（心里想：" + clip(e.note, 60) + "）" : "";
+      return "- " + when + " | " + clip(e.reason, 160) + " ->" + said + did + note;
     })
     .join("\n");
 }

@@ -201,10 +201,10 @@ export class SlowLoop {
       // Autoplay: nothing to react to, nobody talking, no goal running. That's
       // not "stay quiet" — that's "go play the game yourself". #stay cancels it.
       const idle = this.runner.currentGoal() === null;
+      const guide = this.controller.isGuide();
       const mayRoam = this.cfg.tuning.autoplay && idle && !this.controller.isHoldPosition();
-      reason = quiet
-        ? null
-        : this.controller.isGuide()
+      if (shouldHeartbeat({ quiet, guide, idle })) {
+        reason = guide
           ? // 向导模式：接管心跳 —— 主动看一眼他卡在哪，该提示就提示
             "向导模式的心跳：看一眼他现在的进度，该提示下一步就提示；他正忙着/正爽着就别打断。\n" +
             guideBriefing(state) +
@@ -212,6 +212,7 @@ export class SlowLoop {
           : mayRoam
             ? this.autoplayReason(state)
             : "heartbeat：随便看一眼 —— 有想说的就说（进度、吐槽、发现都行），实在没有就不说";
+      }
     }
 
     this.prev = state;
@@ -251,6 +252,25 @@ export interface MemoryDigestSource {
  * "你记得的事" —— 让记忆**真的出现在提示里**，而不是留在数据库里等它自己去查。
  * 只在"自己找活干"这个做计划的时刻带上，免得每 45 秒重复同一段。
  */
+/**
+ * 心跳该不该叫醒大脑。
+ *
+ * 三种情况：
+ *   · #quiet 闭嘴模式   → 不叫
+ *   · 向导模式          → 叫（这个心跳是刻意的：主动看他卡在哪、提示下一步）
+ *   · 闲着没事          → 叫（"自己找点活干"）
+ *   · **任务正在跑**    → 不叫 ⭐
+ *
+ * 最后一条是实测踩出来的：任务在跑的时候每 45 秒叫它一次，它只能说点什么，
+ * 于是历史里连着四条「砍树任务还在跑，不吭声了。」—— 完成任务时 goal-runner
+ * 自己会来报，中途根本不需要叫。
+ */
+export function shouldHeartbeat(opts: { quiet: boolean; guide: boolean; idle: boolean }): boolean {
+  if (opts.quiet) return false;
+  if (opts.guide) return true;
+  return opts.idle;
+}
+
 function memoryDigest(memory?: MemoryDigestSource): string {
   if (!memory) return "";
   let notes: string[] = [];
