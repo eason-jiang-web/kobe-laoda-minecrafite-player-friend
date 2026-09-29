@@ -160,8 +160,14 @@ export class SlowLoop {
   /**
    * The "nothing is happening, go do something" prompt. See buildAutoplayReason.
    */
+  /** 上一轮闲下来是干活还是陪聊 —— 两种轮流来，别永远只知道干活。 */
+  private autoplayMood: AutoplayMood = "work";
+
   private autoplayReason(state: GameState): string {
-    return buildAutoplayReason(state, this.memory);
+    this.autoplayMood = nextAutoplayMood(this.autoplayMood, state);
+    return this.autoplayMood === "chat"
+      ? buildChatMoodReason(state, this.memory)
+      : buildAutoplayReason(state, this.memory);
   }
 
   private tick(): void {
@@ -219,7 +225,12 @@ export class SlowLoop {
       }
     }
     if (!reason && !quiet && this.vibe.due())
-      reason = "vibe check：看看周围有没有什么好聊的（风景、地形、他在干嘛、进度）—— 有就随口说一句";
+      // 这是"纯聊天"的常驻机会 —— 所以明确写「别报进度」。
+      // 不写的话它每次都拿进度来交差（实测 24 句里 18 句是同一个进度换个说法）。
+      reason =
+        "vibe check：看一眼周围 —— 有没有什么值得**跟他说一句**的？" +
+        "风景、地形、他在干嘛、你自己在琢磨什么、想吐槽什么都行。" +
+        "**别报进度、别列计划**（那个刚说过了）。有一句就说，没有就别开口。";
     if (!reason && this.heartbeat.due()) {
       // Autoplay: nothing to react to, nobody talking, no goal running. That's
       // not "stay quiet" — that's "go play the game yourself". #stay cancels it.
@@ -355,6 +366,52 @@ export function oreReason(
     head + "。你手上是" + tierName(verdict.have) + "，挖得动，" + why + "。\n" +
     "→ 顺手挖了它（dig_at 到那个坐标），挖到跟他说一声；他要是赶时间就算了。"
   );
+}
+
+/**
+ * 闲下来的时候，心跳有两种心情，轮流来：
+ *
+ *   work —— 自己找活干（原来只有这一种）
+ *   chat —— **不排活**，就跟他搭话、陪着他
+ *
+ * 为什么必须有两种：只有 work 的话，它就成了一个"只干活不说话"的打工机器人 ——
+ * 你不在的时候它自己玩，你在的时候它汇报进度，聊天这件事根本不在它的选项里。
+ */
+export type AutoplayMood = "work" | "chat";
+
+/** 他得在附近，聊天才有意义（不在旁边就回去干活）。 */
+export function nextAutoplayMood(
+  prev: AutoplayMood,
+  state: Pick<GameState, "player">,
+): AutoplayMood {
+  const nearby = state.player?.online === true && (state.player.distance ?? 99) <= 24;
+  if (!nearby) return "work";
+  return prev === "work" ? "chat" : "work";
+}
+
+/** 陪聊那一版的心跳提示词：重点是**别排活、别报进度**。 */
+export function buildChatMoodReason(state: GameState, memory?: MemoryDigestSource): string {
+  const inv =
+    state.inventory.length === 0
+      ? "背包是空的"
+      : state.inventory
+          .slice()
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 6)
+          .map((i) => `${i.name}×${i.count}`)
+          .join("、");
+  return [
+    "陪他一会儿：没人叫你，你也没有正在进行的任务 —— 这次**不用排活**，就在他旁边待着。",
+    "跟他搭句话：他刚才在干嘛、手上这些东西够折腾点什么、你看见什么好玩的、问一句他今天想干啥。"
+      + "吐槽地形、点评他的操作、扯个篮球的淡、关心他一句 —— 都行。",
+    "**别汇报进度、别列计划、别报数据** —— 那是上一轮的事。这次就是聊天，"
+      + "哪怕只说一句没用的废话也比念进度条强。",
+    `背包里主要是：${inv}。`,
+    "说完就安静跟着他；实在没什么想说的，就什么都不说（这也完全没问题）。",
+    memoryDigest(memory),
+  ]
+    .filter((line) => line.length > 0)
+    .join("\n");
 }
 
 export function buildAutoplayReason(state: GameState, memory?: MemoryDigestSource): string {
